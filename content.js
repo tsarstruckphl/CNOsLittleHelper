@@ -22,6 +22,7 @@ setInterval(() => {
 }, MARKET_CACHE_TTL_MS);
 
 function runAll() {
+processUpdateBannerAlert(); // Added update banner check
   restyleFilterPanel();
   syncBoostUIState(getFilterAccordionContainer() || document);
   addGameDeviggerCheckbox();

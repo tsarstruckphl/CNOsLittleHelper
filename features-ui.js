@@ -539,3 +539,68 @@ function setupGameRightClickDevigger() {
     document.body.appendChild(menu);
   });
 }
+
+
+function processUpdateBannerAlert() {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+
+  chrome.storage.local.get(['updateAvailable', 'latestVersion', 'releasePageUrl', 'cno_dismissed_update_version'], (data) => {
+    const existingBanner = document.getElementById('cno-update-banner-alert');
+
+    if (!data.updateAvailable) {
+      if (existingBanner) existingBanner.remove();
+      return;
+    }
+
+    if (data.cno_dismissed_update_version === data.latestVersion) {
+      if (existingBanner) existingBanner.remove();
+      return;
+    }
+
+    const targetContainer = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo');
+    if (!targetContainer || existingBanner) return;
+
+    const currentVersion = chrome.runtime.getManifest().version;
+    const iconUrl = chrome.runtime.getURL('icons/icon16.png');
+    const releaseUrl = data.releasePageUrl || 'https://github.com/tsarstruckphl/CNOsLittleHelper/releases/latest';
+
+    const banner = document.createElement('div');
+    banner.id = 'cno-update-banner-alert';
+    banner.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-left: 5px solid #0284c7;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 10px 0 14px 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 0.88rem;
+      color: #0c4a6e;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    `;
+
+    banner.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <img src="${iconUrl}" width="16" height="16" alt="CNO Helper" style="vertical-align: middle; flex-shrink: 0;" />
+        <span>
+          <strong>CNO's Little Helper Update Available!</strong> 
+          Version <strong>v${data.latestVersion}</strong> is available (Installed: v${currentVersion}).
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+        <a href="${releaseUrl}" target="_blank" style="background: #0284c7; color: #ffffff; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 0.82rem;">Download Update ↗</a>
+        <button id="cno-dismiss-update-btn" style="background: none; border: none; font-size: 1.1rem; color: #64748b; cursor: pointer; padding: 0 4px;" title="Dismiss for session">✕</button>
+      </div>
+    `;
+
+    targetContainer.parentNode.insertBefore(banner, targetContainer.nextSibling);
+
+    document.getElementById('cno-dismiss-update-btn').addEventListener('click', () => {
+      chrome.storage.local.set({ cno_dismissed_update_version: data.latestVersion });
+      banner.remove();
+    });
+  });
+}

@@ -1,3 +1,6 @@
+1.1.7
+--Added GitHub checking for updates
+
 1.1.6
 --Improved market search (allow multiple searches per insert)
 --Added right-click to filter to only injured players by last name OR full name	

@@ -29,7 +29,12 @@
       margin-bottom: 6px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+    }
+    h1 img {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
     }
     p.subtitle {
       font-size: 0.85rem;
@@ -71,6 +76,28 @@
       font-size: 0.8rem;
       color: #64748b;
       line-height: 1.3;
+    }
+    /* Version & Update Card */
+    .cno-version-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+    .cno-version-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #0369a1;
+      margin-bottom: 6px;
+    }
+    .cno-version-body {
+      font-size: 0.85rem;
+      color: #475569;
     }
     .footer-links {
       border-top: 1px solid #f1f5f9;
@@ -194,7 +221,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>⚡ CNO's Little Helper Settings</h1>
+    <h1>
+      <img src="icons/icon128.png" alt="CNO Helper Icon" />
+      CNO's Little Helper Settings
+    </h1>
     <p class="subtitle">Customize which dynamic enhancements run on CrazyNinjaOdds pages.</p>
 
     <div class="setting-group">
@@ -243,6 +273,33 @@
       <div class="footer-links-row">
         <a id="viewChangeLog">View Change Log</a>
         <a id="viewRoadMap">View Roadmap</a>
+      </div>
+
+      <!-- Extension Version & Update Information -->
+      <div id="cno-version-card" class="cno-version-card">
+        <div class="cno-version-header">
+          <img src="icons/icon16.png" width="16" height="16" alt="CNO Helper Icon" />
+          <span id="cno-version-header-text">CNO's Little Helper</span>
+        </div>
+        <div id="cno-version-body" class="cno-version-body">
+          <p id="cno-version-status-text" style="margin: 0;">Checking for updates...</p>
+          <div id="cno-update-instructions" style="display: none; margin-top: 10px;">
+            <div style="margin-bottom: 10px;">
+              <a id="cno-download-zip-btn" class="cno-support-button" style="background-color: #10b981;" target="_blank">Download Release Package (.zip) ↗</a>
+              <a id="cno-view-release-notes" style="margin-left: 10px; color: #0284c7; text-decoration: none; font-weight: 600; font-size: 0.82rem;" target="_blank">View Release Notes ↗</a>
+            </div>
+            
+            <div style="text-align: left; background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.8rem; color: #334155;">
+              <strong>How to install update:</strong>
+              <ol style="margin: 4px 0 0 18px; padding: 0; line-height: 1.4;">
+                <li>Click <strong>Download Release Package (.zip)</strong> above and extract the file to a folder.</li>
+                <li>Navigate to <code>chrome://extensions/</code> in a browser tab.</li>
+                <li>Turn on <strong>Developer mode</strong> using the toggle switch in the top-right corner.</li>
+                <li>Click <strong>Load unpacked</strong> in the top-left and select your extracted folder.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Support CNO Banner -->

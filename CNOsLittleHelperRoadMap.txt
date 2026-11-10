@@ -2,7 +2,8 @@ Planned Improvements
 --------------------
 Bugs:
 --Injury badge not showing up on Boost page 
-
+--Fix FV % odds on calc page
+--Remove Percentage odds when CNO already includes them (not on calc page)
 (+) Non-chrome repo and update checker :(
 (+) Ability to switch default devigger to hedgecalc instead of CNO
 (+) MLB weather filter 
