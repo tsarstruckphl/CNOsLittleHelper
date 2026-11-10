@@ -1,0 +1,19 @@
+/* Seamless Filter Loading Mask - Mask filter panels across accordion, markets, and games pages until restyled */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion > div:first-of-type .accordionContent:not(.cno-ready),
+#ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion > div:nth-child(3) .accordionContent:not(.cno-ready),
+#cno-markets-filter-wrapper:not(.cno-ready),
+#cno-games-filter-wrapper:not(.cno-ready) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion > div:first-of-type .accordionContent.cno-ready,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion > div:nth-child(3) .accordionContent.cno-ready,
+#cno-markets-filter-wrapper.cno-ready,
+#cno-games-filter-wrapper.cno-ready {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transition: opacity 0.12s ease-in;
+}

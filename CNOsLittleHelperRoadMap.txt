@@ -1,0 +1,18 @@
+Planned Improvements
+--------------------
+Bugs:
+--Injury badge not showing up on Boost page 
+
+(+) Non-chrome repo and update checker :(
+(+) Ability to switch default devigger to hedgecalc instead of CNO
+(+) MLB weather filter 
+(+) Add Top 25 filter for NCAAB and NCAAF
+
+
+Possible Improvements
+---------------------
+
+(-) Ability to add a profit boost to Positive EV's Calc Box
+(-) Ability to save, search through, and select CNO presets
+(-) Ability to backup or import settings/presets  
+(-) NFL weather icons

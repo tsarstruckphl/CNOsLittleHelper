@@ -1,0 +1,28 @@
+1.1.6
+--Improved market search (allow multiple searches per insert)
+--Added right-click to filter to only injured players by last name OR full name	
+--Added clear text box for team/event, market, and name text boxes
+
+
+1.1.5
+--Added modernized filter to the remaining pages: Risk-Free Bet, Win & Get, Bet & Get, Markets, Games.
+--Adds a button to switch between EV+ and Boost pages (copying filters along the way)
+--Add ability to exclude -or- only include players with injury statuses via checkbox/right-click. Supported league (MLB,NBA,NFL, or WNBA) must be selected first.
+--Add "Top 25 Only" option when league selection is NCAAB or NCAAF 
+--Add clear filters button on all pages
+--Injury status improved refresh schedule and provides last update injury update (with more information available on hover)
+--Tab skipped syntax link
+--Back-end changes to ease future development
+--Fix for missing % odds badges when using hedge method
+--Fix for missing "switch back to modern view" button in certain circumstances 
+
+1.1.4
+--Added market search on all pages
+--Fixed bug where profit boost amount box would not always show 
+--Modified Sport and League drop-downs so that only one is selected
+--Roadmap and changelog added
+
+1.1.3
+--Added % odds for ProphetX w/ decommissioned odds on hover
+--Added hover tooltip for full book name on games page
+
