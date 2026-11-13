@@ -1,19 +1,17 @@
 Planned Improvements
 --------------------
-Bugs:
---Injury badge not showing up on Boost page 
---Fix FV % odds on calc page
---Remove Percentage odds when CNO already includes them (not on calc page)
-(+) Non-chrome repo and update checker :(
+
+(+) Ability to backup and import settings/saved filters 
 (+) Ability to switch default devigger to hedgecalc instead of CNO
 (+) MLB weather filter 
-(+) Add Top 25 filter for NCAAB and NCAAF
+(+) Ability to remove books from game odd pages (by default removing the inactive ones like ST, FDYW, etc.)
 
+Bugs to fix: 
+--tabbing between items in "classic"  view is broken
 
 Possible Improvements
 ---------------------
 
 (-) Ability to add a profit boost to Positive EV's Calc Box
-(-) Ability to save, search through, and select CNO presets
-(-) Ability to backup or import settings/presets  
 (-) NFL weather icons
+(-) Ability to export and import CNO settings (not extension settings)

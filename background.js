@@ -1,35 +1,74 @@
 const GITHUB_RELEASE_API = 'https://api.github.com/repos/tsarstruckphl/CNOsLittleHelper/releases/latest';
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const UPDATE_ALARM_NAME = 'cno-update-check';
+
+function ensureUpdateAlarm() {
+  chrome.alarms.get(UPDATE_ALARM_NAME, (alarm) => {
+    if (!alarm) {
+      chrome.alarms.create(UPDATE_ALARM_NAME, { periodInMinutes: 24 * 60 });
+    }
+  });
+}
 
 chrome.runtime.onStartup.addListener(() => {
+  ensureUpdateAlarm();
   checkLatestRelease();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
+  ensureUpdateAlarm();
   checkLatestRelease();
 });
 
-async function checkLatestRelease() {
+// Re-check every 24 hours regardless of whether the browser was restarted.
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === UPDATE_ALARM_NAME) {
+    checkLatestRelease(true);
+  }
+});
+
+// Allows the extension's own pages (e.g. the options page) to request a fresh check.
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'cno-check-update' && sender.id === chrome.runtime.id &&
+      sender.url && sender.url.startsWith(chrome.runtime.getURL(''))) {
+    checkLatestRelease(true).then(sendResponse);
+    return true; // keep the channel open for the async response
+  }
+});
+
+async function checkLatestRelease(force = false) {
+  const currentVersion = chrome.runtime.getManifest().version;
+
   try {
-    const data = await chrome.storage.local.get(['cno_last_update_check', 'updateAvailable', 'latestVersion']);
+    const data = await chrome.storage.local.get([
+      'cno_last_update_check', 'cno_checked_version', 'updateAvailable', 'latestVersion', 'downloadUrl', 'releasePageUrl'
+    ]);
     const now = Date.now();
 
-    if (data.cno_last_update_check && (now - data.cno_last_update_check < CHECK_INTERVAL_MS)) {
-      if (data.updateAvailable) {
-        setBadgeState(true);
-      }
-      return;
+    // The cache is only trusted if it was made by this same installed version; after the
+    // extension is updated or its version changes, check GitHub again right away.
+    if (!force && data.cno_last_update_check && data.cno_checked_version === currentVersion &&
+        (now - data.cno_last_update_check < CHECK_INTERVAL_MS)) {
+      const stillAvailable = isVersionHigher(data.latestVersion, currentVersion);
+      setBadgeState(stillAvailable);
+      return {
+        ok: true,
+        updateAvailable: stillAvailable,
+        latestVersion: data.latestVersion || '',
+        currentVersion: currentVersion,
+        downloadUrl: data.downloadUrl || '',
+        releasePageUrl: data.releasePageUrl || ''
+      };
     }
 
     const response = await fetch(GITHUB_RELEASE_API, {
       headers: { 'Accept': 'application/vnd.github.v3+json' }
     });
 
-    if (!response.ok) return;
+    if (!response.ok) return { ok: false, currentVersion: currentVersion };
 
     const release = await response.json();
     const latestVersion = (release.tag_name || '').replace(/^v/i, '').trim();
-    const currentVersion = chrome.runtime.getManifest().version;
 
     const updateAvailable = isVersionHigher(latestVersion, currentVersion);
 
@@ -43,6 +82,7 @@ async function checkLatestRelease() {
 
     await chrome.storage.local.set({
       cno_last_update_check: now,
+      cno_checked_version: currentVersion,
       updateAvailable: updateAvailable,
       latestVersion: latestVersion,
       downloadUrl: zipDownloadUrl,
@@ -50,8 +90,18 @@ async function checkLatestRelease() {
     });
 
     setBadgeState(updateAvailable);
+
+    return {
+      ok: true,
+      updateAvailable: updateAvailable,
+      latestVersion: latestVersion,
+      currentVersion: currentVersion,
+      downloadUrl: zipDownloadUrl,
+      releasePageUrl: release.html_url
+    };
   } catch (err) {
     console.warn('CNO Helper update check error:', err);
+    return { ok: false, currentVersion: currentVersion };
   }
 }
 
@@ -68,7 +118,33 @@ function isVersionHigher(latest, current) {
   return false;
 }
 
+const UPGRADE_MENU_ID = 'cno-upgrade-menu';
+
+// Adds/removes "Upgrade to new version" in the toolbar icon's right-click menu
+function setUpgradeMenu(hasUpdate) {
+  chrome.contextMenus.removeAll(() => {
+    if (chrome.runtime.lastError) { /* ignore */ }
+    if (hasUpdate) {
+      chrome.contextMenus.create({
+        id: UPGRADE_MENU_ID,
+        title: 'Upgrade to new version',
+        contexts: ['action']
+      }, () => {
+        if (chrome.runtime.lastError) { /* ignore */ }
+      });
+    }
+  });
+}
+
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === UPGRADE_MENU_ID) {
+    // Jump straight to the version / update section of the options page
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') + '#cno-version-card' });
+  }
+});
+
 function setBadgeState(hasUpdate) {
+  setUpgradeMenu(hasUpdate);
   if (hasUpdate) {
     chrome.action.setBadgeText({ text: 'NEW' });
     chrome.action.setBadgeBackgroundColor({ color: '#e11d48' });
@@ -76,3 +152,10 @@ function setBadgeState(hasUpdate) {
     chrome.action.setBadgeText({ text: '' });
   }
 }
+
+// Lets the content script's "CNO LH Options" button open the options page in a new tab
+chrome.runtime.onMessage.addListener((msg, sender) => {
+  if (msg && msg.type === 'cno-open-options' && sender.id === chrome.runtime.id) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
+  }
+});

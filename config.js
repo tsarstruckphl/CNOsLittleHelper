@@ -27,8 +27,11 @@ let userSettings = {
   enableInjuryBadges: true,
   enableMlbWeather: true,
   enableFilterModernization: true,
-  enablePctBadges: true
+  enablePctBadges: true,
+  hideShareLinkPane: false,
+  hideReadmePane: false
 };
+let userSettingsLoaded = false;
 
 function refreshUserSettings(callback) {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -37,12 +40,16 @@ function refreshUserSettings(callback) {
       enableInjuryBadges: true,
       enableMlbWeather: true,
       enableFilterModernization: true,
-      enablePctBadges: true
+      enablePctBadges: true,
+      hideShareLinkPane: false,
+      hideReadmePane: false
     }, (items) => {
       userSettings = items;
+      userSettingsLoaded = true;
       if (callback) callback();
     });
   } else {
+    userSettingsLoaded = true;
     if (callback) callback();
   }
 }
@@ -61,7 +68,7 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged)
 
     for (let [key, { newValue }] of Object.entries(changes)) {
       if (key in userSettings) {
-        userSettings[key] = newValue !== undefined ? newValue : true;
+        userSettings[key] = newValue !== undefined ? newValue : !(key === 'hideShareLinkPane' || key === 'hideReadmePane');
         if (key === 'enableFilterModernization') {
           needsFilterReset = true;
         }

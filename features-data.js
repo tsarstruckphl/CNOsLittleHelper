@@ -112,6 +112,41 @@ async function loadAPRankings() {
   }
 }
 
+function escapeHtmlForAp(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Exact (full school name) lookup, so "Arkansas" can never match "Central Arkansas"
+function getApRank(sportKey, rawTeam) {
+  const norm = normalizeTeamName(rawTeam);
+  if (!norm) return null;
+
+  let rank = apRankingsMap.get(`${sportKey}|${norm}`);
+  // CNO writes "Miami (FL)"; ESPN lists the Hurricanes simply as "Miami"
+  if (!rank && norm === 'miami fl') rank = apRankingsMap.get(`${sportKey}|miami`);
+  return rank || null;
+}
+
+// Events in CNO are always "Away @ Home". Returns the annotated HTML, or null if neither team is ranked.
+function buildApRankedEventHtml(eventText, sportKey) {
+  const parts = eventText.split(/\s+@\s+/);
+  if (parts.length < 2) return null;
+
+  let changed = false;
+  const out = parts.map(part => {
+    const team = part.trim();
+    const rank = getApRank(sportKey, team);
+    const safe = escapeHtmlForAp(team);
+    if (rank) {
+      changed = true;
+      return `${safe} <span class="cno-ap-rank" style="color:#0284c7; font-weight:bold; font-size:0.85em;">(#${rank})</span>`;
+    }
+    return safe;
+  });
+
+  return changed ? out.join(' @ ') : null;
+}
+
 function processAPRankings() {
   if (!userSettings.enableApRankings) {
     document.querySelectorAll('.cno-ap-rank').forEach(el => el.remove());
@@ -145,28 +180,8 @@ function processAPRankings() {
     const eventText = eventLink.textContent.trim();
     if (eventText.includes('(#')) return;
 
-    const teams = eventText.split(/\s+@\s+|\s+vs\.?\s+|\s+v\.\s+/i);
-    let modifiedText = eventText;
-    let rankAdded = false;
-
-    teams.forEach(rawTeam => {
-      const norm = normalizeTeamName(rawTeam);
-      const rank = apRankingsMap.get(`${sportKey}|${norm}`);
-
-      if (rank) {
-        const regex = new RegExp(`\\b${rawTeam.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}\\b`, 'g');
-        modifiedText = modifiedText.replace(regex, `${rawTeam} <span class="cno-ap-rank" style="color:#0284c7; font-weight:bold; font-size:0.85em;">(#${rank})</span>`);
-        rankAdded = true;
-      }
-    });
-
-    if (rankAdded) {
-      if (eventLink.tagName === 'A') {
-        eventLink.innerHTML = modifiedText;
-      } else {
-        eventCell.innerHTML = modifiedText;
-      }
-    }
+    const rankedHtml = buildApRankedEventHtml(eventText, sportKey);
+    if (rankedHtml) eventLink.innerHTML = rankedHtml;
     eventCell.dataset.hasApRanked = "true";
   });
 
@@ -195,24 +210,8 @@ function processAPRankings() {
       const eventText = eventLink.textContent.trim();
       if (eventText.includes('(#')) return;
 
-      const teams = eventText.split(/\s+@\s+|\s+vs\.?\s+|\s+v\.\s+/i);
-      let modifiedText = eventText;
-      let rankAdded = false;
-
-      teams.forEach(rawTeam => {
-        const norm = normalizeTeamName(rawTeam);
-        const rank = apRankingsMap.get(`${sportKey}|${norm}`);
-
-        if (rank) {
-          const regex = new RegExp(`\\b${rawTeam.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}\\b`, 'g');
-          modifiedText = modifiedText.replace(regex, `${rawTeam} <span class="cno-ap-rank" style="color:#0284c7; font-weight:bold; font-size:0.85em;">(#${rank})</span>`);
-          rankAdded = true;
-        }
-      });
-
-      if (rankAdded) {
-        eventLink.innerHTML = modifiedText;
-      }
+      const rankedHtml = buildApRankedEventHtml(eventText, sportKey);
+      if (rankedHtml) eventLink.innerHTML = rankedHtml;
       div.dataset.hasApRanked = "true";
     });
   });
@@ -509,23 +508,145 @@ function parseInjuryCSV(sport, csvText, targetMap) {
   return b1Timestamp;
 }
 
+function escapeAttrForInjury(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function createInjuryBadge(injuryInfo) {
   const status = typeof injuryInfo === 'object' ? injuryInfo.status : injuryInfo;
   const meta = STATUS_MAP[status] || { label: status, bg: '#ef4444' };
   const fg = '#ffffff';
 
   let tooltip = `${meta.label} (${status})`;
+  let details = '';
+  let playerName = '';
   if (typeof injuryInfo === 'object') {
     if (injuryInfo.fullDetails) {
       tooltip += ` - ${injuryInfo.fullDetails}`;
+      details = injuryInfo.fullDetails;
+    }
+    playerName = injuryInfo.rawName || '';
+    if (playerName.includes(',')) {
+      const parts = playerName.split(',').map(p => p.trim());
+      if (parts.length >= 2) playerName = `${parts[1]} ${parts[0]}`;
     }
   }
   if (latestInjuryTimestamp) {
     tooltip += ` [Refreshed: ${latestInjuryTimestamp}]`;
   }
+  tooltip += ' (Click to search status on Google)';
 
-  return `<span class="cno-injury-badge" title="${tooltip.replace(/"/g, '"')}" style="background:${meta.bg}; color:${fg}; padding:0px 3px; border-radius:2px; font-size:0.65em; font-weight:bold; line-height:1.1; margin-right:4px; display:inline-block; vertical-align:middle; cursor:help;">${status}</span>`;
+  return `<span class="cno-injury-badge" title="${escapeAttrForInjury(tooltip)}" data-cno-name="${escapeAttrForInjury(playerName)}" data-cno-status="${escapeAttrForInjury(status)}" data-cno-label="${escapeAttrForInjury(meta.label)}" data-cno-bg="${escapeAttrForInjury(meta.bg)}" data-cno-details="${escapeAttrForInjury(details)}" data-cno-refreshed="${escapeAttrForInjury(latestInjuryTimestamp || '')}" style="background:${meta.bg}; color:${fg}; padding:2px 5px; border-radius:3px; font-size:0.65em; font-weight:bold; line-height:1.2; margin-right:4px; display:inline-block; vertical-align:middle; cursor:pointer;">${status}</span>`;
 }
+
+// ---- Click-to-open injury detail card with a Google search link ----
+
+function closeInjuryPopover() {
+  const existing = document.getElementById('cno-injury-popover');
+  if (existing) existing.remove();
+}
+
+function openInjuryPopover(badge) {
+  closeInjuryPopover();
+
+  const name = badge.dataset.cnoName || '';
+  const status = badge.dataset.cnoStatus || '';
+  const label = badge.dataset.cnoLabel || status;
+  const bg = badge.dataset.cnoBg || '#ef4444';
+  const details = badge.dataset.cnoDetails || '';
+  const refreshed = badge.dataset.cnoRefreshed || '';
+
+  const pop = document.createElement('div');
+  pop.id = 'cno-injury-popover';
+  pop.style.cssText = `
+    position: fixed; z-index: 1000003; width: 280px; max-width: 90vw;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25); padding: 12px 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.85rem; color: #1e293b; line-height: 1.4; text-align: left; white-space: normal;
+  `;
+
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:6px;';
+  const pill = document.createElement('span');
+  pill.textContent = status;
+  pill.style.cssText = `background:${bg}; color:#fff; font-weight:700; font-size:0.75rem; padding:1px 6px; border-radius:3px; flex-shrink:0;`;
+  const title = document.createElement('strong');
+  title.textContent = name || 'Player';
+  title.style.cssText = 'font-size:0.92rem;';
+  head.appendChild(pill);
+  head.appendChild(title);
+  pop.appendChild(head);
+
+  const statusLine = document.createElement('div');
+  statusLine.textContent = label;
+  statusLine.style.cssText = 'font-weight:600; color:#334155;';
+  pop.appendChild(statusLine);
+
+  if (details) {
+    const detailLine = document.createElement('div');
+    detailLine.textContent = details;
+    detailLine.style.cssText = 'margin-top:4px; color:#475569;';
+    pop.appendChild(detailLine);
+  }
+
+  if (refreshed) {
+    const refLine = document.createElement('div');
+    refLine.textContent = `Refreshed: ${refreshed}`;
+    refLine.style.cssText = 'margin-top:6px; font-size:0.74rem; color:#64748b;';
+    pop.appendChild(refLine);
+  }
+
+  if (name) {
+    const link = document.createElement('a');
+    link.href = `https://www.google.com/search?q=${encodeURIComponent(`is ${name} playing today?`)}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Check Injury Status on Google \u2197';
+    link.style.cssText = 'display:inline-block; margin-top:8px; color:#0284c7; font-weight:600; text-decoration:underline;';
+    pop.appendChild(link);
+  }
+
+  document.body.appendChild(pop);
+
+  // Position under the badge, flipping/clamping to stay on screen
+  const rect = badge.getBoundingClientRect();
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  let left = Math.min(Math.max(8, rect.left), window.innerWidth - pw - 8);
+  let top = rect.bottom + 6;
+  if (top + ph > window.innerHeight - 8) top = Math.max(8, rect.top - ph - 6);
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+}
+
+document.addEventListener('click', (e) => {
+  const badge = e.target.closest ? e.target.closest('.cno-injury-badge') : null;
+  const insidePopover = e.target.closest ? e.target.closest('#cno-injury-popover') : null;
+
+  if (badge) {
+    e.preventDefault();
+    e.stopPropagation();
+    const name = badge.dataset.cnoName || '';
+    if (name) {
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(`is ${name} playing today?`)}`, '_blank', 'noopener,noreferrer');
+    } else {
+      openInjuryPopover(badge);
+    }
+  } else if (!insidePopover) {
+    closeInjuryPopover();
+  }
+}, true);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeInjuryPopover();
+}, true);
+
+window.addEventListener('scroll', closeInjuryPopover, true);
 
 function processInjuryBadges() {
   if (!userSettings.enableInjuryBadges) {
@@ -535,10 +656,25 @@ function processInjuryBadges() {
 
   if (injuryDataMap.size === 0) return;
 
+  const headerBetIdxCache = new WeakMap();
+  const getHeaderBetIdx = (row) => {
+    const table = row.closest('table');
+    if (!table) return -1;
+    if (headerBetIdxCache.has(table)) return headerBetIdxCache.get(table);
+    let idx = -1;
+    const ths = Array.from(table.querySelectorAll('thead th'));
+    ths.forEach((th, i) => {
+      if (idx === -1 && th.textContent.trim().toLowerCase() === 'bet') idx = i;
+    });
+    headerBetIdxCache.set(table, idx);
+    return idx;
+  };
+
   const rows = document.querySelectorAll('tr');
   rows.forEach(row => {
     const cells = Array.from(row.children);
-    if (cells.length < 9) return;
+    if (cells.length < 8) return;
+    if (row.querySelector('.cno-injury-badge')) return;
 
     let league = '';
     for (const cell of cells) {
@@ -551,19 +687,22 @@ function processInjuryBadges() {
 
     if (!league) return;
 
-    const betCell = cells[8];
-    if (!betCell || betCell.querySelector('.cno-injury-badge')) return;
+    // The bet/player column is not at a fixed index (e.g. EV/Low Hold vs Boost/Free Bet pages),
+    // so try the header-derived column first, then the known positions.
+    const candidates = [getHeaderBetIdx(row), 8, 7].filter((i, pos, arr) => i >= 0 && arr.indexOf(i) === pos);
 
-    const rawBetText = betCell.textContent.trim();
-    const normalizedBetName = normalizePlayerName(rawBetText);
+    for (const idx of candidates) {
+      const betCell = cells[idx];
+      if (!betCell) continue;
 
-    if (!normalizedBetName) return;
+      const normalizedBetName = normalizePlayerName(betCell.textContent.trim());
+      if (!normalizedBetName) continue;
 
-    const lookupKey = `${league}|${normalizedBetName}`;
-    const injuryInfo = injuryDataMap.get(lookupKey);
-
-    if (injuryInfo) {
-      betCell.insertAdjacentHTML('afterbegin', createInjuryBadge(injuryInfo));
+      const injuryInfo = injuryDataMap.get(`${league}|${normalizedBetName}`);
+      if (injuryInfo) {
+        betCell.insertAdjacentHTML('afterbegin', createInjuryBadge(injuryInfo));
+        break;
+      }
     }
   });
 }

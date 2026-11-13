@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CNO's Little Helper",
   "short_name": "CNO Helper",
-  "version": "1.1.7",
+  "version": "1.1.5",
   "description": "For fantasy sports use of Crazy Ninja Odds. Enhances CNO with modern UI, odds-to-percent conversion, injury status, MLB weather, AP ranks, market search, & more!",
   "icons": {
     "16": "icons/icon16.png",
@@ -10,7 +10,21 @@
     "128": "icons/icon128.png"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "alarms",
+    "contextMenus"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon16.png"
+      ],
+      "matches": [
+        "*://crazyninjaodds.com/*",
+        "*://*.crazyninjaodds.com/*",
+        "*://*.crazyninjamike.com/*"
+      ]
+    }
   ],
   "background": {
     "service_worker": "background.js"

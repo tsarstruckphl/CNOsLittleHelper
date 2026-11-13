@@ -5,13 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
     enablePctBadges: true,
     enableInjuryBadges: true,
     enableMlbWeather: true,
-    enableApRankings: true
+    enableApRankings: true,
+    hideShareLinkPane: false,
+    hideReadmePane: false
   }, (items) => {
     document.getElementById('enableFilterModernization').checked = items.enableFilterModernization;
     document.getElementById('enablePctBadges').checked = items.enablePctBadges;
     document.getElementById('enableInjuryBadges').checked = items.enableInjuryBadges;
     document.getElementById('enableMlbWeather').checked = items.enableMlbWeather;
     document.getElementById('enableApRankings').checked = items.enableApRankings;
+    document.getElementById('hideShareLinkPane').checked = items.hideShareLinkPane;
+    document.getElementById('hideReadmePane').checked = items.hideReadmePane;
   });
 
   // Bind change listeners to auto-save settings
@@ -19,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
   checkboxes.forEach(cb => {
     cb.addEventListener('change', saveOptions);
   });
+
+  // Check GitHub for a newer release every time the options page opens
+  checkForUpdates();
 
   // Bind popup viewers
   document.getElementById('viewChangeLog').addEventListener('click', () => {
@@ -28,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('viewRoadMap').addEventListener('click', () => {
     openTextFileModal('🗺️ Roadmap', 'CNOsLittleHelperRoadMap.txt');
   });
+
+  document.getElementById('requestFeature').addEventListener('click', () => openFeedbackEmail('feature'));
+  document.getElementById('reportBug').addEventListener('click', () => openFeedbackEmail('bug'));
 });
 
 function saveOptions() {
@@ -36,7 +46,9 @@ function saveOptions() {
     enablePctBadges: document.getElementById('enablePctBadges').checked,
     enableInjuryBadges: document.getElementById('enableInjuryBadges').checked,
     enableMlbWeather: document.getElementById('enableMlbWeather').checked,
-    enableApRankings: document.getElementById('enableApRankings').checked
+    enableApRankings: document.getElementById('enableApRankings').checked,
+    hideShareLinkPane: document.getElementById('hideShareLinkPane').checked,
+    hideReadmePane: document.getElementById('hideReadmePane').checked
   };
 
   chrome.storage.local.set(settings, () => {
@@ -99,4 +111,54 @@ function openTextFileModal(title, filename) {
     .catch(err => {
       body.textContent = `Unable to load ${filename}: ${err.message}`;
     });
+}
+
+// ====================================================
+// UPDATE CHECK
+// ====================================================
+
+function checkForUpdates() {
+  const statusText = document.getElementById('cno-version-status-text');
+  const instructions = document.getElementById('cno-update-instructions');
+  const githubLink = document.getElementById('cno-github-link');
+  const currentVersion = chrome.runtime.getManifest().version;
+
+  statusText.textContent = 'Checking for updates...';
+  instructions.style.display = 'none';
+
+  chrome.runtime.sendMessage({ type: 'cno-check-update' }, (result) => {
+    if (chrome.runtime.lastError || !result || !result.ok) {
+      statusText.textContent = `Installed: v${currentVersion}. Couldn't check for updates right now.`;
+      return;
+    }
+
+    if (result.releasePageUrl) githubLink.href = result.releasePageUrl;
+
+    if (result.updateAvailable) {
+      statusText.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = `Update available: v${result.latestVersion}`;
+      statusText.appendChild(strong);
+      statusText.appendChild(document.createTextNode(` (installed: v${currentVersion})`));
+
+      document.getElementById('cno-download-zip-btn').href = result.downloadUrl || result.releasePageUrl;
+      document.getElementById('cno-view-release-notes').href = result.releasePageUrl;
+      instructions.style.display = 'block';
+    } else {
+      statusText.textContent = `You're up to date (v${currentVersion}).`;
+    }
+  });
+}
+
+// ====================================================
+// FEEDBACK (opens the Google Form in a new tab)
+// ====================================================
+
+const FEEDBACK_FORM_URLS = {
+  bug: 'https://docs.google.com/forms/d/e/1FAIpQLSc3fx8DLCU2kTbFORhZIILXpiWOTJ682rasmEbRidXuiDmFsw/viewform',
+  feature: 'https://docs.google.com/forms/d/e/1FAIpQLSelyD9hbcT1CJWHP-o371uIMOyRBs9S72BVTs761_PB7sqMVA/viewform?usp=publish-editor'
+};
+
+function openFeedbackEmail(kind) {
+  window.open(FEEDBACK_FORM_URLS[kind] || FEEDBACK_FORM_URLS.feature, '_blank', 'noopener,noreferrer');
 }

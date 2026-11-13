@@ -17,3 +17,72 @@
   pointer-events: auto !important;
   transition: opacity 0.12s ease-in;
 }
+
+/* Hide the CrazyNinjaMike notice until the extension has checked whether it was dismissed (prevents a flash on load) */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_LabelRedMessage:not([data-cno-notice-checked]) {
+  display: none !important;
+}
+
+/* Optional hiding of the Share Link / Readme accordion panes (toggled from the options page) */
+.cno-hide-pane {
+  display: none !important;
+}
+
+/* ====================================================
+   MODERN UPDATE BUTTON + TIGHTER SPACING (only when Modernized Filter Panel UI is on)
+   ==================================================== */
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_ButtonUpdate,
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_ButtonUpdate_Faux {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #0284c7;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='23 4 23 10 17 10'/%3E%3Cpolyline points='1 20 1 14 7 14'/%3E%3Cpath d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 15px 15px;
+  color: #ffffff;
+  border: 1px solid #0369a1;
+  border-radius: 6px;
+  padding: 7px 16px 7px 34px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-right: 12px;
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_ButtonUpdate:hover {
+  background-color: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(2, 132, 199, 0.3);
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_ButtonUpdate:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* The greyed-out button shown while results are loading */
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_ButtonUpdate_Faux {
+  background-color: #94a3b8;
+  border-color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Collapse the stacked line breaks around the Update button */
+html.cno-modern-ui .cno-tight-br,
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_TimerAjaxDelayedLoad + br,
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_TimerAjaxDelayedLoad + br + br {
+  display: none !important;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView {
+  margin-top: 8px;
+}
+
+html.cno-modern-ui .cno-support-callout {
+  margin: 6px 0 8px 0;
+}

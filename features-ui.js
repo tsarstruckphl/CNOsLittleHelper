@@ -59,149 +59,9 @@ function annotateGameHeaderTooltips() {
 }
 
 function processOddsTable() {
-  const isGamePage = window.location.pathname.toLowerCase().includes('game.aspx');
-  const targetBooks = ['novig', 'kalshi', 'prophetx', 'kambi', 'nv', 'ki', 'px', 'km'];
-
+  // Percentage badges were removed from the table pages (including game.aspx);
+  // they now only appear in the calculator popups (see injectModalBadges).
   annotateGameHeaderTooltips();
-
-  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
-  if (table) {
-    const headerCells = Array.from(table.querySelectorAll('thead th'));
-    const targetColIndexes = [];
-
-    // 1) Direct book matrix columns (e.g. Game page header columns)
-    headerCells.forEach((th, idx) => {
-      const txt = th.textContent.trim().toUpperCase();
-      if (['NV', 'KI', 'PX', 'KM', 'NOVIG', 'KALSHI', 'PROPHETX', 'KAMBI'].includes(txt)) {
-        targetColIndexes.push({
-          index: idx,
-          isProphetX: (txt === 'PX' || txt === 'PROPHETX')
-        });
-      }
-    });
-
-    const rows = table.querySelectorAll('tbody tr:not(.footable-row-detail)');
-
-    if (targetColIndexes.length > 0) {
-      rows.forEach(row => {
-        targetColIndexes.forEach(colObj => {
-          const cell = row.children[colObj.index];
-          if (cell) convertOddsInContainer(cell, isGamePage, colObj.isProphetX);
-        });
-      });
-    } else {
-      // 2) Multi-book row-based tables (Free Bet, Risk Free Bet, EV, Low Hold, Boost, Arb, etc.)
-      const sbColIndexes = [];
-      const oddsColIndexes = [];
-
-      headerCells.forEach((th, idx) => {
-        const txt = th.textContent.trim().toLowerCase();
-        if (txt.includes('sportsbook') || txt.includes('book') || txt.includes('site')) {
-          sbColIndexes.push(idx);
-        }
-        if (txt.includes('odds') || txt.includes('line') || txt.includes('price')) {
-          oddsColIndexes.push(idx);
-        }
-      });
-
-      // Pair each sportsbook column with its closest odds column (checking both left and right)
-      const pairedCols = [];
-      if (sbColIndexes.length > 0 && oddsColIndexes.length > 0) {
-        sbColIndexes.forEach(sbIdx => {
-          let closestOddsIdx = oddsColIndexes[0];
-          let minDistance = Math.abs(sbIdx - closestOddsIdx);
-
-          oddsColIndexes.forEach(oIdx => {
-            const distance = Math.abs(sbIdx - oIdx);
-            if (distance < minDistance) {
-              minDistance = distance;
-              closestOddsIdx = oIdx;
-            }
-          });
-
-          pairedCols.push({ sbIdx, oddsIdx: closestOddsIdx });
-        });
-      } else {
-        // Fallback for standard 2-book tables if dynamic pairing falls back
-        pairedCols.push({ sbIdx: 9, oddsIdx: 8 });
-        pairedCols.push({ sbIdx: 12, oddsIdx: 11 });
-      }
-
-      rows.forEach(row => {
-        const cells = Array.from(row.children);
-        pairedCols.forEach(({ sbIdx, oddsIdx }) => {
-          const sportsbookCell = cells[sbIdx];
-          const oddsCell = cells[oddsIdx];
-
-          if (sportsbookCell && oddsCell) {
-            const bookLink = sportsbookCell.querySelector('a');
-            const cellText = (bookLink ? bookLink.textContent : sportsbookCell.textContent).trim().toLowerCase();
-
-            const isTargetBook = targetBooks.some(book => {
-              if (cellText === book) return true;
-              if (book === 'novig' && cellText.includes('novig')) return true;
-              if (book === 'kalshi' && cellText.includes('kalshi')) return true;
-              if (book === 'prophetx' && cellText.includes('prophetx')) return true;
-              if (book === 'kambi' && cellText.includes('kambi')) return true;
-              if (book === 'nv' && (cellText === 'nv' || cellText.startsWith('nv '))) return true;
-              if (book === 'ki' && (cellText === 'ki' || cellText.startsWith('ki '))) return true;
-              if (book === 'px' && (cellText === 'px' || cellText.startsWith('px '))) return true;
-              if (book === 'km' && (cellText === 'km' || cellText.startsWith('km '))) return true;
-              return false;
-            });
-
-            if (isTargetBook) {
-              const isProphetX = cellText.includes('prophetx') || cellText === 'px' || cellText.startsWith('px ');
-              convertOddsInContainer(oddsCell, false, isProphetX);
-            }
-          }
-        });
-      });
-    }
-  }
-
-  // 3) Responsive / Footable detail inner rows
-  const detailInnerDivs = document.querySelectorAll('.footable-row-detail-inner');
-  detailInnerDivs.forEach(container => {
-    const divs = Array.from(container.children);
-    divs.forEach((d, idx) => {
-      const sbText = d.textContent.trim().toLowerCase();
-      if (sbText.includes('sportsbook') || sbText.includes('book :')) {
-        const isTargetBook = targetBooks.some(book => {
-          if (book === 'novig' && sbText.includes('novig')) return true;
-          if (book === 'kalshi' && sbText.includes('kalshi')) return true;
-          if (book === 'prophetx' && sbText.includes('prophetx')) return true;
-          if (book === 'kambi' && sbText.includes('kambi')) return true;
-          if (book === 'nv' && sbText.includes('nv')) return true;
-          if (book === 'ki' && sbText.includes('ki')) return true;
-          if (book === 'px' && sbText.includes('px')) return true;
-          if (book === 'km' && sbText.includes('km')) return true;
-          return false;
-        });
-
-        if (isTargetBook) {
-          const isProphetX = sbText.includes('prophetx') || sbText.includes('px');
-          // Find closest odds div in responsive detail row (checking adjacent divs)
-          let closestOddsDiv = null;
-          let minDistance = Infinity;
-
-          divs.forEach((od, oIdx) => {
-            if (od.textContent.trim().toLowerCase().includes('odds :')) {
-              const dist = Math.abs(idx - oIdx);
-              if (dist < minDistance) {
-                minDistance = dist;
-                closestOddsDiv = od;
-              }
-            }
-          });
-
-          if (closestOddsDiv) {
-            convertOddsInContainer(closestOddsDiv, isGamePage, isProphetX);
-          }
-        }
-      }
-    });
-  });
 }
 
 // ====================================================
@@ -221,13 +81,23 @@ function processCalcPopup() {
   }
 }
 
+// Returns only the element's own text nodes, ignoring child elements such as
+// the injected .cno-badge. Prevents the badge text from being read back as odds.
+function getOwnText(el) {
+  let t = '';
+  el.childNodes.forEach(n => {
+    if (n.nodeType === Node.TEXT_NODE) t += n.textContent;
+  });
+  return t.trim();
+}
+
 function updateDeviggerLink(popup) {
   let fairOdds = '';
   const fairEl = document.getElementById('PopupCalc_EVTab_FairOdds') || 
                  document.getElementById('PopupCalc_FairOdds');
 
   if (fairEl) {
-    fairOdds = fairEl.textContent.trim().replace('+', '');
+    fairOdds = getOwnText(fairEl).replace('+', '');
   } else {
     const hedgeInput = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_TabContainerPopupCalc_TabPanelPopupCalc_Hedge_TextBoxPopupCalc_HedgeTab_Hedge_BetOdds') ||
                        document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_TextBoxPopupCalc_Hedge_BetOdds');
@@ -305,7 +175,7 @@ function injectModalBadges() {
       return;
     }
 
-    const currentOddsVal = isInput ? el.value.trim() : el.textContent.trim();
+    const currentOddsVal = isInput ? el.value.trim() : getOwnText(el);
     const currentPct = americanToPercentage(currentOddsVal);
 
     if (el.dataset.lastSeenOdds !== currentOddsVal) {
@@ -541,18 +411,92 @@ function setupGameRightClickDevigger() {
 }
 
 
+function openInstallInstructionsModal() {
+  const existing = document.getElementById('cno-install-instructions-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'cno-install-instructions-modal';
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px);
+    z-index: 1000002; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: #ffffff; border-radius: 8px; width: 440px; max-width: 90vw;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); border: 1px solid #e2e8f0; overflow: hidden;
+  `;
+  box.innerHTML = `
+    <div style="padding:14px 16px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0; font-size:1.05rem; color:#0284c7; font-weight:700;">How to install the update</h3>
+      <button type="button" id="cno-install-modal-close" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#64748b;">\u2715</button>
+    </div>
+    <div style="padding:14px 16px; font-size:0.9rem; color:#334155; line-height:1.5;">
+      <ol style="margin:0; padding-left:20px; display:flex; flex-direction:column; gap:8px;">
+        <li>Download the .zip and extract it to a folder.</li>
+        <li>Open <code style="background:#f1f5f9; padding:1px 5px; border-radius:3px;">chrome://extensions/</code> and turn on <strong>Developer mode</strong>.</li>
+        <li>Click <strong>Load unpacked</strong> and select the extracted folder (remove the old version first).</li>
+      </ol>
+    </div>
+  `;
+  modal.appendChild(box);
+
+  const close = () => {
+    modal.remove();
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+
+  box.querySelector('#cno-install-modal-close').addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', onKey, true);
+
+  document.body.appendChild(modal);
+}
+
+// Compares dotted version strings (e.g. "1.1.8" vs "1.1.7")
+function cnoIsVersionHigher(latest, current) {
+  if (!latest || !current) return false;
+  const p1 = String(latest).split('.').map(Number);
+  const p2 = String(current).split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const v1 = p1[i] || 0;
+    const v2 = p2[i] || 0;
+    if (v1 > v2) return true;
+    if (v1 < v2) return false;
+  }
+  return false;
+}
+
+const CNO_UPDATE_DISMISS_KEY = 'cno_dismissed_update_version';
+
+// One-time cleanup of the old permanent dismissal that used to be saved in extension storage
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+  chrome.storage.local.remove(CNO_UPDATE_DISMISS_KEY);
+}
+
+function cnoGetDismissedUpdateVersion() {
+  try { return sessionStorage.getItem(CNO_UPDATE_DISMISS_KEY); } catch (e) { return null; }
+}
+
 function processUpdateBannerAlert() {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
 
-  chrome.storage.local.get(['updateAvailable', 'latestVersion', 'releasePageUrl', 'cno_dismissed_update_version'], (data) => {
+  chrome.storage.local.get(['updateAvailable', 'latestVersion', 'releasePageUrl'], (data) => {
     const existingBanner = document.getElementById('cno-update-banner-alert');
 
-    if (!data.updateAvailable) {
+    // Judge by the stored latest version against the installed one, not just the stored flag,
+    // so a stale flag (e.g. after the installed version changed) can't hide or wrongly show the banner
+    const installedVersion = chrome.runtime.getManifest().version;
+    if (!data.latestVersion || !cnoIsVersionHigher(data.latestVersion, installedVersion)) {
       if (existingBanner) existingBanner.remove();
       return;
     }
 
-    if (data.cno_dismissed_update_version === data.latestVersion) {
+    if (cnoGetDismissedUpdateVersion() === data.latestVersion) {
       if (existingBanner) existingBanner.remove();
       return;
     }
@@ -591,6 +535,7 @@ function processUpdateBannerAlert() {
         </span>
       </div>
       <div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
+        <a href="#" id="cno-install-instructions-link" style="color: #0369a1; font-weight: 600; font-size: 0.82rem; text-decoration: underline;">Instructions to install</a>
         <a href="${releaseUrl}" target="_blank" style="background: #0284c7; color: #ffffff; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 0.82rem;">Download Update ↗</a>
         <button id="cno-dismiss-update-btn" style="background: none; border: none; font-size: 1.1rem; color: #64748b; cursor: pointer; padding: 0 4px;" title="Dismiss for session">✕</button>
       </div>
@@ -598,9 +543,185 @@ function processUpdateBannerAlert() {
 
     targetContainer.parentNode.insertBefore(banner, targetContainer.nextSibling);
 
+    document.getElementById('cno-install-instructions-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      openInstallInstructionsModal();
+    });
+
     document.getElementById('cno-dismiss-update-btn').addEventListener('click', () => {
-      chrome.storage.local.set({ cno_dismissed_update_version: data.latestVersion });
+      try { sessionStorage.setItem(CNO_UPDATE_DISMISS_KEY, data.latestVersion); } catch (e) { /* ignore */ }
       banner.remove();
     });
   });
+}
+
+// ====================================================
+// DISMISSIBLE CRAZYNINJAMIKE NOTICE (red message after the "+ev bets:" header)
+// ====================================================
+
+const CNO_NOTICE_LABEL_ID = 'ContentPlaceHolderMain_ContentPlaceHolderRight_LabelRedMessage';
+const CNO_NOTICE_STORAGE_KEY = 'cno_dismissed_notice';
+let cnoDismissedNotice = null;
+let cnoDismissedNoticeLoaded = false;
+
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+  chrome.storage.local.get([CNO_NOTICE_STORAGE_KEY], (data) => {
+    cnoDismissedNotice = (data && typeof data[CNO_NOTICE_STORAGE_KEY] === 'string') ? data[CNO_NOTICE_STORAGE_KEY] : null;
+    cnoDismissedNoticeLoaded = true;
+    processNoticeDismiss();
+  });
+
+  // Keep multiple open CNO tabs in sync
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !(CNO_NOTICE_STORAGE_KEY in changes)) return;
+    const nv = changes[CNO_NOTICE_STORAGE_KEY].newValue;
+    cnoDismissedNotice = typeof nv === 'string' ? nv : null;
+    processNoticeDismiss();
+  });
+} else {
+  cnoDismissedNoticeLoaded = true;
+}
+
+function getNoticeText(label) {
+  return label.textContent.replace(/\s+/g, ' ').trim();
+}
+
+function processNoticeDismiss() {
+  if (!cnoDismissedNoticeLoaded) return;
+
+  const label = document.getElementById(CNO_NOTICE_LABEL_ID);
+  const existingBtn = document.getElementById('cno-notice-dismiss-btn');
+  const existingShow = document.getElementById('cno-notice-show-link');
+
+  const removeControls = () => {
+    if (existingBtn) existingBtn.remove();
+    if (existingShow) existingShow.remove();
+  };
+
+  if (!label) {
+    removeControls();
+    return;
+  }
+
+  // content.css hides the notice until this flag is set, so a dismissed notice never flashes on load.
+  label.dataset.cnoNoticeChecked = 'true';
+
+  const text = getNoticeText(label);
+  if (!text) {
+    removeControls();
+    label.style.display = '';
+    return;
+  }
+
+  const isDismissed = (text === cnoDismissedNotice);
+
+  if (isDismissed) {
+    label.style.display = 'none';
+    if (existingBtn) existingBtn.remove();
+
+    if (!existingShow) {
+      const link = document.createElement('span');
+      link.id = 'cno-notice-show-link';
+      link.setAttribute('role', 'button');
+      link.textContent = 'Show CrazyNinjaMike notice';
+      link.style.cssText = 'color:#0284c7; cursor:pointer; font-size:0.8em; font-weight:600; text-decoration:underline; margin-left:8px;';
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        cnoDismissedNotice = null;
+        chrome.storage.local.remove(CNO_NOTICE_STORAGE_KEY);
+        processNoticeDismiss();
+      });
+      label.parentNode.insertBefore(link, label);
+    }
+  } else {
+    label.style.display = '';
+    if (existingShow) existingShow.remove();
+
+    if (!existingBtn) {
+      const btn = document.createElement('span');
+      btn.id = 'cno-notice-dismiss-btn';
+      btn.setAttribute('role', 'button');
+      btn.title = 'Dismiss this notice until it changes';
+      btn.textContent = '\u2715';
+      btn.style.cssText = 'color:#64748b; cursor:pointer; font-size:0.9em; font-weight:bold; margin-left:8px; padding:0 4px; border:1px solid #cbd5e1; border-radius:3px; background:#f8fafc;';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const currentLabel = document.getElementById(CNO_NOTICE_LABEL_ID);
+        if (!currentLabel) return;
+        cnoDismissedNotice = getNoticeText(currentLabel);
+        chrome.storage.local.set({ [CNO_NOTICE_STORAGE_KEY]: cnoDismissedNotice });
+        processNoticeDismiss();
+      });
+      label.parentNode.insertBefore(btn, label);
+    }
+  }
+}
+
+// ====================================================
+// OPTIONAL HIDING OF "SHARE LINK" / "README" ACCORDION PANES
+// ====================================================
+
+// Returns how many of the two panes were found (so callers know when the accordion is fully parsed)
+function processAccordionPanes() {
+  if (typeof userSettingsLoaded === 'undefined' || !userSettingsLoaded) return 0;
+
+  const accordion = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion');
+  if (!accordion) return 0;
+
+  const hideByTitle = {
+    'share link': !!userSettings.hideShareLinkPane,
+    'readme': !!userSettings.hideReadmePane
+  };
+
+  let found = 0;
+  Array.from(accordion.children).forEach(child => {
+    if (!child.classList.contains('accordionHeader') && !child.classList.contains('accordionHeaderSelected')) return;
+
+    const title = child.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!(title in hideByTitle)) return;
+    found++;
+
+    // A class (not inline style) is used so the accordion's own open/close styling is left untouched
+    child.classList.toggle('cno-hide-pane', hideByTitle[title]);
+    const content = child.nextElementSibling;
+    if (content) content.classList.toggle('cno-hide-pane', hideByTitle[title]);
+  });
+
+  return found;
+}
+
+// Apply as soon as the accordion is parsed, so the panes don't flash before being hidden
+(function observeAccordionPanes() {
+  if (typeof MutationObserver === 'undefined') return;
+  const obs = new MutationObserver(() => {
+    if (processAccordionPanes() >= 2) obs.disconnect();
+  });
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('load', () => obs.disconnect());
+})();
+
+// ====================================================
+// MODERN UI HELPERS (Update button styling + tighter vertical spacing)
+// ====================================================
+
+// Adds/removes a root class that content.css keys off, so the look follows the "Modernized Filter Panel UI" setting
+function applyModernUiClass() {
+  if (typeof userSettingsLoaded === 'undefined' || !userSettingsLoaded) return;
+  document.documentElement.classList.toggle('cno-modern-ui', !!userSettings.enableFilterModernization);
+}
+
+// Marks the <br> spacers sitting directly above the Update panel so the modern CSS can collapse them
+function processModernSpacing() {
+  const panel = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView');
+  if (!panel) return;
+
+  let el = panel.previousElementSibling;
+  while (el) {
+    if (el.tagName === 'BR') {
+      el.classList.add('cno-tight-br');
+    } else if (!(el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.id === 'cno-support-callout')) {
+      break;
+    }
+    el = el.previousElementSibling;
+  }
 }

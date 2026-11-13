@@ -240,7 +240,7 @@
         <input type="checkbox" id="enablePctBadges">
         <div class="setting-label">
           <span class="setting-title">Odds-to-Percentage Badges</span>
-          <span class="setting-desc">Shows probability % badges next to American odds for exchange sportsbooks (Novig, Kalshi, ProphetX).</span>
+          <span class="setting-desc">Shows probability % badges next to American odds in the calculator popups for exchange sportsbooks (Novig, Kalshi, ProphetX).</span>
         </div>
       </label>
 
@@ -267,12 +267,30 @@
           <span class="setting-desc">Annotates NCAAF and NCAAB team names with current AP rankings.</span>
         </div>
       </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideShareLinkPane">
+        <div class="setting-label">
+          <span class="setting-title">Hide "Share Link" Pane</span>
+          <span class="setting-desc">Hides the Share Link section below the filters on the tool pages.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideReadmePane">
+        <div class="setting-label">
+          <span class="setting-title">Hide "Readme" Pane</span>
+          <span class="setting-desc">Hides the Readme section below the filters on the tool pages.</span>
+        </div>
+      </label>
     </div>
 
     <div class="footer-links">
       <div class="footer-links-row">
         <a id="viewChangeLog">View Change Log</a>
         <a id="viewRoadMap">View Roadmap</a>
+        <a id="requestFeature">Request a Feature</a>
+        <a id="reportBug">Report a Bug</a>
       </div>
 
       <!-- Extension Version & Update Information -->
@@ -283,19 +301,21 @@
         </div>
         <div id="cno-version-body" class="cno-version-body">
           <p id="cno-version-status-text" style="margin: 0;">Checking for updates...</p>
+          <p style="margin: 6px 0 0 0;">
+            <a id="cno-github-link" href="https://github.com/tsarstruckphl/CNOsLittleHelper" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: none; font-weight: 600; font-size: 0.82rem;">View on GitHub ↗</a>
+          </p>
           <div id="cno-update-instructions" style="display: none; margin-top: 10px;">
             <div style="margin-bottom: 10px;">
-              <a id="cno-download-zip-btn" class="cno-support-button" style="background-color: #10b981;" target="_blank">Download Release Package (.zip) ↗</a>
-              <a id="cno-view-release-notes" style="margin-left: 10px; color: #0284c7; text-decoration: none; font-weight: 600; font-size: 0.82rem;" target="_blank">View Release Notes ↗</a>
+              <a id="cno-download-zip-btn" class="cno-support-button" style="background-color: #10b981;" target="_blank" rel="noopener noreferrer">Download Release Package (.zip) ↗</a>
+              <a id="cno-view-release-notes" style="margin-left: 10px; color: #0284c7; text-decoration: none; font-weight: 600; font-size: 0.82rem;" target="_blank" rel="noopener noreferrer">View Release Notes ↗</a>
             </div>
-            
+
             <div style="text-align: left; background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.8rem; color: #334155;">
-              <strong>How to install update:</strong>
+              <strong>To update:</strong>
               <ol style="margin: 4px 0 0 18px; padding: 0; line-height: 1.4;">
-                <li>Click <strong>Download Release Package (.zip)</strong> above and extract the file to a folder.</li>
-                <li>Navigate to <code>chrome://extensions/</code> in a browser tab.</li>
-                <li>Turn on <strong>Developer mode</strong> using the toggle switch in the top-right corner.</li>
-                <li>Click <strong>Load unpacked</strong> in the top-left and select your extracted folder.</li>
+                <li>Download the .zip and extract it to a folder.</li>
+                <li>Open <code>chrome://extensions/</code> and turn on <strong>Developer mode</strong>.</li>
+                <li>Click <strong>Load unpacked</strong> and select the extracted folder (remove the old version first).</li>
               </ol>
             </div>
           </div>

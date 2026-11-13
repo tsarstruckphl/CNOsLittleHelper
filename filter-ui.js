@@ -463,16 +463,105 @@ function buildCrossToolUrl(targetPage, scopeContainer = document) {
   if (elMinBooks && elMinBooks.value.trim()) params.set('books_min', elMinBooks.value.trim());
   if (elMaxResults && elMaxResults.value.trim()) params.set('result_max', elMaxResults.value.trim());
 
-  if (targetPage.includes('odds-boost.aspx')) {
+  const destKey = (targetPage.match(/\/([a-z0-9-]+)\.aspx/i) || [])[1] || 'positive-ev';
+  const hasBoost = destKey === 'odds-boost';
+  const hasReward = ['risk-free-bet', 'win-and-get', 'bet-and-get'].includes(destKey);
+
+  // Only carry over fields the destination page actually has
+  if (hasBoost) {
+    const boostTypeEl = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
+    if (boostTypeEl && boostTypeEl.value) params.set('boost_type', boostTypeEl.value.trim());
+
+    const pctEl = getEl('TextBoxBoostPercentage') || (document.getElementById('spanBoostPercentage') || document).querySelector('input[type="text"]');
+    const oddsEl = getEl('TextBoxBoostOdds') || (document.getElementById('spanBoostOdds') || document).querySelector('input[type="text"]');
+    if (pctEl && pctEl.value && pctEl.value.trim()) params.set('boost_pct', pctEl.value.trim());
+    if (oddsEl && oddsEl.value && oddsEl.value.trim()) params.set('boost_odds', oddsEl.value.trim());
+
     params.set('profit_strategy', '1');
   }
 
-  const baseUrl = targetPage.includes('odds-boost.aspx') 
-    ? '/site/tools/odds-boost.aspx' 
-    : '/site/tools/positive-ev.aspx';
+  if (hasReward) {
+    const rewardEl = getEl('TextBoxReward');
+    if (rewardEl && rewardEl.value.trim()) params.set('reward', rewardEl.value.trim());
 
+    const convEl = document.querySelector('input[name$="RadioButtonListFreeCreditConversionRate"]:checked');
+    if (convEl && convEl.value) params.set('fccr_type', convEl.value.trim());
+
+    const customEl = getEl('TextBoxFreeCreditConversionRate');
+    if (customEl && customEl.value.trim()) params.set('fccr', customEl.value.trim());
+  }
+
+  const baseUrl = `/site/tools/${destKey}.aspx`;
   const queryString = params.toString();
   return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+}
+
+const SWITCH_PAGES = [
+  { key: 'positive-ev', label: 'Positive EV', icon: '🎲' },
+  { key: 'odds-boost', label: 'Odds Boost', icon: '🚀' },
+  { key: 'free-bet-converter', label: 'Free Bet', icon: '🎁' },
+  { key: 'risk-free-bet', label: 'Risk Free Bet', icon: '🛡️' },
+  { key: 'bet-and-get', label: 'Bet and Get', icon: '🎟️' },
+  { key: 'win-and-get', label: 'Win and Get', icon: '🏆' },
+  { key: 'low-hold', label: 'Low Hold', icon: '📉' }
+];
+
+// Hover (or click) drop-down listing the other tool pages
+function attachSwitchPageMenu(btn) {
+  let menu = null;
+  let hideTimer = null;
+
+  const cancelHide = () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } };
+  const hide = () => { cancelHide(); if (menu) { menu.remove(); menu = null; } };
+  const scheduleHide = () => { cancelHide(); hideTimer = setTimeout(hide, 180); };
+
+  const show = () => {
+    cancelHide();
+    if (menu) return;
+
+    const currentPath = window.location.pathname.toLowerCase();
+    menu = document.createElement('div');
+    menu.id = 'cno-switch-page-menu';
+    menu.style.cssText = `
+      position: fixed; z-index: 1000001; min-width: 170px;
+      background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.18); padding: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    SWITCH_PAGES.filter(p => !currentPath.includes(`${p.key}.aspx`)).forEach(p => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.textContent = `${p.icon} ${p.label}`;
+      item.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; padding:7px 10px; font-size:0.85rem; font-weight:600; color:#0369a1; cursor:pointer; border-radius:4px; white-space:nowrap;';
+      item.addEventListener('mouseover', () => item.style.background = '#f0f9ff');
+      item.addEventListener('mouseout', () => item.style.background = 'none');
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const container = getFilterAccordionContainer() || document;
+        const url = buildCrossToolUrl(`/site/tools/${p.key}.aspx`, container);
+        hide();
+        window.location.href = url;
+      });
+      menu.appendChild(item);
+    });
+
+    menu.addEventListener('mouseenter', cancelHide);
+    menu.addEventListener('mouseleave', scheduleHide);
+    document.body.appendChild(menu);
+
+    const rect = btn.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${rect.bottom + 2}px`;
+  };
+
+  btn.addEventListener('mouseenter', show);
+  btn.addEventListener('mouseleave', scheduleHide);
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (menu) hide(); else show();
+  });
 }
 
 function clearAllPageFilters(container = document) {
@@ -681,43 +770,43 @@ function setupFilterToggle() {
     btnGroup.insertBefore(clearBtn, btnGroup.firstChild);
   }
 
+  if (!isNonAccordionPage) {
+    ensureSavedFilterButtons(btnGroup, clearBtn);
+  }
+
   const isClassic = localStorage.getItem('cno_use_classic_view') === 'true';
 
-  let crossToolBtn = document.getElementById('cno-cross-tool-btn');
-  if (isPosEvPage || isOddsBoostPage) {
-    if (!crossToolBtn) {
-      crossToolBtn = document.createElement('button');
-      crossToolBtn.id = 'cno-cross-tool-btn';
-      crossToolBtn.type = 'button';
+  const currentPathForSwitch = window.location.pathname.toLowerCase();
+  const isSwitchPage = SWITCH_PAGES.some(p => currentPathForSwitch.includes(`${p.key}.aspx`));
+
+  const oldCrossBtn = document.getElementById('cno-cross-tool-btn');
+  if (oldCrossBtn) oldCrossBtn.remove();
+
+  let switchBtn = document.getElementById('cno-switch-page-btn');
+  if (isSwitchPage && !isNonAccordionPage) {
+    if (!switchBtn) {
+      switchBtn = document.createElement('button');
+      switchBtn.id = 'cno-switch-page-btn';
+      switchBtn.type = 'button';
+      switchBtn.textContent = '🔀 Switch Page ▾';
+      switchBtn.style.cssText = `
+        padding: 3px 10px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        border-radius: 4px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #0369a1;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      `;
+      attachSwitchPageMenu(switchBtn);
     }
-
-    crossToolBtn.style.cssText = `
-      padding: 3px 10px;
-      font-size: 0.8rem;
-      font-weight: bold;
-      border-radius: 4px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #0369a1;
-      cursor: pointer;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    `;
-
-    crossToolBtn.textContent = isPosEvPage ? '🚀 Switch to Odds Boost' : '🎲 Switch to Positive EV';
-
-    crossToolBtn.onclick = (e) => {
-      e.stopPropagation();
-      const targetPage = isPosEvPage ? '/site/tools/odds-boost.aspx' : '/site/tools/positive-ev.aspx';
-      const container = getFilterAccordionContainer() || document;
-      const targetUrl = buildCrossToolUrl(targetPage, container);
-      window.location.href = targetUrl;
-    };
-
-    if (!btnGroup.contains(crossToolBtn)) {
-      btnGroup.appendChild(crossToolBtn);
+    if (!btnGroup.contains(switchBtn)) {
+      btnGroup.appendChild(switchBtn);
     }
-  } else if (crossToolBtn) {
-    crossToolBtn.remove();
+  } else if (switchBtn) {
+    switchBtn.remove();
   }
 
   let toggleBtn = document.getElementById('cno-view-toggle-btn');
@@ -767,6 +856,37 @@ function setupFilterToggle() {
 
   if (!btnGroup.contains(toggleBtn)) {
     btnGroup.appendChild(toggleBtn);
+  }
+
+  let optionsBtn = document.getElementById('cno-options-btn');
+  if (!optionsBtn) {
+    optionsBtn = document.createElement('button');
+    optionsBtn.id = 'cno-options-btn';
+    optionsBtn.type = 'button';
+    optionsBtn.textContent = '⚙️ CNO LH Options';
+    optionsBtn.style.cssText = `
+      padding: 3px 10px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #0369a1;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      margin-left: 44px;
+    `;
+    optionsBtn.onclick = (e) => {
+      e.stopPropagation();
+      try {
+        chrome.runtime.sendMessage({ type: 'cno-open-options' });
+      } catch (err) {
+        console.warn('CNO Helper: could not open the options page', err);
+      }
+    };
+  }
+  if (optionsBtn.nextElementSibling !== toggleBtn || optionsBtn.parentNode !== btnGroup) {
+    btnGroup.insertBefore(optionsBtn, toggleBtn);
   }
 }
 
@@ -2258,4 +2378,1143 @@ function restyleFilterPanel() {
   restoreSavedBetNameContains(container);
   container.dataset.restyled = "true";
   container.classList.add('cno-ready');
+}
+
+
+// ====================================================
+// SAVED FILTER SELECTIONS (SAVE / APPLY)
+// ====================================================
+
+const SAVED_FILTERS_STORAGE_KEY = 'cno_saved_filters';
+
+const SAVED_FILTER_BTN_CSS = `
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0369a1;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+`;
+
+function getSavedFiltersPageKey() {
+  const seg = window.location.pathname.toLowerCase().split('/').filter(Boolean).pop() || 'default';
+  return seg.replace(/\.aspx$/, '');
+}
+
+function readSavedFilters(callback) {
+  chrome.storage.local.get([SAVED_FILTERS_STORAGE_KEY], (data) => {
+    callback((data && data[SAVED_FILTERS_STORAGE_KEY]) || {});
+  });
+}
+
+function writeSavedFilters(all, callback) {
+  chrome.storage.local.set({ [SAVED_FILTERS_STORAGE_KEY]: all }, () => {
+    if (callback) callback();
+  });
+}
+
+function showSavedFilterToast(message) {
+  const old = document.getElementById('cno-saved-filter-toast');
+  if (old) old.remove();
+  const toast = document.createElement('div');
+  toast.id = 'cno-saved-filter-toast';
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed; bottom: 20px; right: 20px; z-index: 1000001;
+    background: #0f172a; color: #ffffff; padding: 10px 14px; border-radius: 6px;
+    font-size: 0.85rem; max-width: 360px; box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 6000);
+}
+
+// ----------------------------------------------------
+// Collect / apply field values
+// ----------------------------------------------------
+
+function collectFilterSelections(container = document) {
+  const getEl = (suffix) => container.querySelector(`[id$="${suffix}"]`) || document.querySelector(`[id$="${suffix}"]`);
+  const sel = { selects: {}, texts: {}, checks: {}, radios: {}, boost: {} };
+
+  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague'].forEach(suffix => {
+    const el = getEl(suffix);
+    if (el && el.selectedIndex >= 0) {
+      const opt = el.options[el.selectedIndex];
+      sel.selects[suffix] = { value: opt.value, text: opt.text.trim() };
+    }
+  });
+
+  [
+    'TextBoxMinimumOdds', 'TextBoxMaximumOdds', 'TextBoxEventNameContains', 'TextBoxMaximumDateHours',
+    'TextBoxMarketNameContains', 'TextBoxBetNameContains', 'TextBoxMinimumBetPoints', 'TextBoxMaximumBetPoints',
+    'TextBoxReward', 'TextBoxFreeCreditConversionRate'
+  ].forEach(suffix => {
+    const el = getEl(suffix);
+    if (el) sel.texts[suffix] = el.value;
+  });
+
+  // Save the user's own text, not the injected injured-player / Top 25 syntax
+  const excludeCb = document.querySelector('#cno-exclude-injured-cb');
+  const top25Cb = document.querySelector('#cno-top25-cb');
+
+  if (sel.texts.TextBoxBetNameContains !== undefined && excludeCb && excludeCb.checked) {
+    const raw = sessionStorage.getItem(BET_CONTAINS_STORAGE_KEY);
+    if (raw !== null) sel.texts.TextBoxBetNameContains = raw;
+  }
+  if (sel.texts.TextBoxEventNameContains !== undefined && top25Cb && top25Cb.checked) {
+    const raw = sessionStorage.getItem(AP_TOP25_STORAGE_KEY);
+    if (raw !== null) sel.texts.TextBoxEventNameContains = raw;
+  }
+
+  const elLive = getEl('CheckBoxIsLive');
+  if (elLive) sel.checks.live = elLive.checked;
+  if (excludeCb) sel.checks.excludeInjured = excludeCb.checked;
+  if (top25Cb) sel.checks.top25 = top25Cb.checked;
+
+  const readRadio = (tableEl) => {
+    if (!tableEl) return null;
+    const radios = Array.from(tableEl.querySelectorAll('input[type="radio"]'));
+    const idx = radios.findIndex(r => r.checked);
+    if (idx === -1) return null;
+    return { value: radios[idx].value, index: idx };
+  };
+
+  const boostType = readRadio(getEl('RadioButtonListOddsBoostType'));
+  if (boostType) sel.radios.boostType = boostType;
+  const conversion = readRadio(getEl('RadioButtonListFreeCreditConversionRate'));
+  if (conversion) sel.radios.conversion = conversion;
+
+  const spanPct = document.getElementById('spanBoostPercentage');
+  const spanOdds = document.getElementById('spanBoostOdds');
+  const inputPct = spanPct ? spanPct.querySelector('input[type="text"]') : null;
+  const inputOdds = spanOdds ? spanOdds.querySelector('input[type="text"]') : null;
+  if (inputPct) sel.boost.pct = inputPct.value;
+  if (inputOdds) sel.boost.odds = inputOdds.value;
+
+  return sel;
+}
+
+function setSelectFromSaved(el, saved) {
+  if (!el || !saved) return true;
+  const opts = Array.from(el.options);
+  let idx = opts.findIndex(o => o.value === saved.value);
+  if (idx === -1) idx = opts.findIndex(o => o.text.trim() === saved.text);
+  if (idx === -1) return false;
+  el.selectedIndex = idx;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
+function setRadioFromSaved(tableEl, saved) {
+  if (!tableEl || !saved) return true;
+  const radios = Array.from(tableEl.querySelectorAll('input[type="radio"]'));
+  const r = radios.find(x => x.value === saved.value) || radios[saved.index];
+  if (!r) return false;
+  r.checked = true;
+  r.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
+function applyFilterSelections(container, sel) {
+  const getEl = (suffix) => container.querySelector(`[id$="${suffix}"]`) || document.querySelector(`[id$="${suffix}"]`);
+  const failures = [];
+
+  // Drop any in-flight injected syntax so the update uses the freshly applied text
+  sessionStorage.removeItem(BET_CONTAINS_STORAGE_KEY);
+  sessionStorage.removeItem(AP_TOP25_STORAGE_KEY);
+  sessionStorage.removeItem('cno_top25_cb_active');
+
+  const selects = sel.selects || {};
+  const selectLabels = {
+    DropDownListSportsbookSite_All: 'Sportsbook',
+    DropDownListSportsbookSite_NonDFS: 'Sportsbook',
+    DropDownListSport: 'Sport',
+    DropDownListLeague: 'League'
+  };
+  // Sportsbook first, then Sport, then League (sport/league are mutually exclusive)
+  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague'].forEach(suffix => {
+    if (!selects[suffix]) return;
+    let el = getEl(suffix);
+    if (!el && suffix.indexOf('DropDownListSportsbookSite_') === 0) {
+      // The destination page may use the other sportsbook dropdown variant
+      const otherSuffix = suffix === 'DropDownListSportsbookSite_All' ? 'DropDownListSportsbookSite_NonDFS' : 'DropDownListSportsbookSite_All';
+      if (!selects[otherSuffix]) el = getEl(otherSuffix);
+    }
+    if (!el) return;
+    if (!setSelectFromSaved(el, selects[suffix])) {
+      failures.push(`${selectLabels[suffix]} "${selects[suffix].text}"`);
+    }
+  });
+
+  updateExcludeInjuredCheckboxState(container);
+  updateTop25CheckboxState(container);
+
+  Object.keys(sel.texts || {}).forEach(suffix => {
+    const el = getEl(suffix);
+    if (el) {
+      el.value = sel.texts[suffix];
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+
+  const checks = sel.checks || {};
+  const elLive = getEl('CheckBoxIsLive');
+  if (elLive && checks.live !== undefined) elLive.checked = !!checks.live;
+
+  const excludeCb = document.querySelector('#cno-exclude-injured-cb');
+  if (excludeCb && checks.excludeInjured !== undefined) {
+    if (checks.excludeInjured && excludeCb.disabled) {
+      failures.push('Exclude Injured Players (league not eligible)');
+      excludeCb.checked = false;
+    } else {
+      excludeCb.checked = !!checks.excludeInjured;
+    }
+  }
+
+  const top25Cb = document.querySelector('#cno-top25-cb');
+  if (top25Cb && checks.top25 !== undefined) {
+    const hidden = top25Cb.style.display === 'none' || (top25Cb.parentElement && top25Cb.parentElement.style.display === 'none');
+    if (checks.top25 && hidden) {
+      failures.push('Top 25 (league not eligible)');
+      top25Cb.checked = false;
+    } else {
+      top25Cb.checked = !!checks.top25;
+    }
+  }
+
+  const radios = sel.radios || {};
+  if (radios.boostType && !setRadioFromSaved(getEl('RadioButtonListOddsBoostType'), radios.boostType)) {
+    failures.push('Boost type');
+  }
+  syncBoostUIState(container);
+
+  const boost = sel.boost || {};
+  const spanPct = document.getElementById('spanBoostPercentage');
+  const spanOdds = document.getElementById('spanBoostOdds');
+  const inputPct = spanPct ? spanPct.querySelector('input[type="text"]') : null;
+  const inputOdds = spanOdds ? spanOdds.querySelector('input[type="text"]') : null;
+  if (inputPct && boost.pct !== undefined) inputPct.value = boost.pct;
+  if (inputOdds && boost.odds !== undefined) inputOdds.value = boost.odds;
+
+  if (radios.conversion && !setRadioFromSaved(getEl('RadioButtonListFreeCreditConversionRate'), radios.conversion)) {
+    failures.push('Free credit conversion rate');
+  }
+
+  triggerFilterUpdate(container);
+
+  if (failures.length) {
+    showSavedFilterToast(`Applied, but couldn't set: ${failures.join(', ')}`);
+  }
+}
+
+// ----------------------------------------------------
+// Modal helpers (styled to match the other CNO modals)
+// ----------------------------------------------------
+
+function createSavedFilterModal(titleHtml, width = 460, zIndex = 999999) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: ${zIndex};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+  const content = document.createElement('div');
+  content.style.cssText = `
+    background: #ffffff;
+    border-radius: 8px;
+    width: ${width}px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+  `;
+
+  const header = document.createElement('div');
+  header.style.cssText = `
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  `;
+  header.innerHTML = `
+    <h3 style="margin:0; font-size:1.05rem; color:#0284c7; font-weight:700;">${titleHtml}</h3>
+    <button type="button" class="cno-sf-close" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:#64748b;">✕</button>
+  `;
+
+  const body = document.createElement('div');
+  body.style.cssText = `
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+    flex: 1;
+  `;
+
+  content.appendChild(header);
+  content.appendChild(body);
+  modal.appendChild(content);
+
+  const close = () => modal.remove();
+  header.querySelector('.cno-sf-close').addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  });
+
+  return { modal, content, header, body, close };
+}
+
+function makeSavedFilterModalBtn(label, kind = 'secondary') {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = label;
+  const palette = {
+    primary: 'background:#0284c7; color:#ffffff; border:1px solid #0284c7;',
+    danger: 'background:#dc2626; color:#ffffff; border:1px solid #dc2626;',
+    secondary: 'background:#ffffff; color:#334155; border:1px solid #cbd5e1;'
+  };
+  btn.style.cssText = `${palette[kind]} padding:6px 14px; border-radius:6px; font-size:0.88rem; font-weight:600; cursor:pointer;`;
+  return btn;
+}
+
+const SAVED_FILTER_INPUT_CSS = `
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+`;
+
+function openSavedFilterConfirm(message, confirmLabel, onConfirm, danger = false, cancelLabel = 'Cancel') {
+  const { modal, body, close } = createSavedFilterModal('Please confirm', 420, 1000000);
+
+  const msg = document.createElement('div');
+  msg.textContent = message;
+  msg.style.cssText = 'font-size:0.92rem; color:#334155; line-height:1.4;';
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex; justify-content:flex-end; gap:8px;';
+  const cancelBtn = makeSavedFilterModalBtn(cancelLabel);
+  const okBtn = makeSavedFilterModalBtn(confirmLabel, danger ? 'danger' : 'primary');
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(okBtn);
+
+  body.appendChild(msg);
+  body.appendChild(btnRow);
+
+  cancelBtn.addEventListener('click', close);
+  okBtn.addEventListener('click', () => {
+    close();
+    onConfirm();
+  });
+
+  document.body.appendChild(modal);
+  cancelBtn.focus();
+}
+
+function openSavedFilterNamePicker(onPick) {
+  const { modal, body, close } = createSavedFilterModal('🔍 Choose Existing Filter', 440, 1000000);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Type to search saved filters...';
+  searchInput.style.cssText = SAVED_FILTER_INPUT_CSS;
+
+  const resultsBox = document.createElement('div');
+  resultsBox.style.cssText = `
+    flex: 1;
+    min-height: 120px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #ffffff;
+  `;
+
+  body.appendChild(searchInput);
+  body.appendChild(resultsBox);
+
+  let names = [];
+
+  const pick = (name) => {
+    close();
+    onPick(name);
+  };
+
+  const render = () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const matches = names.filter(n => n.toLowerCase().includes(q));
+    resultsBox.innerHTML = '';
+
+    if (matches.length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = names.length === 0 ? 'No saved filter selections for this page yet.' : 'No matching filter selections.';
+      empty.style.cssText = 'padding:16px; color:#64748b; font-size:0.88rem; text-align:center;';
+      resultsBox.appendChild(empty);
+      return;
+    }
+
+    matches.forEach(name => {
+      const rowBtn = document.createElement('button');
+      rowBtn.type = 'button';
+      rowBtn.textContent = name;
+      rowBtn.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid #f1f5f9; padding:10px 12px; font-size:0.92rem; color:#1e293b; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+      rowBtn.addEventListener('mouseover', () => rowBtn.style.background = '#f0f9ff');
+      rowBtn.addEventListener('mouseout', () => rowBtn.style.background = 'none');
+      rowBtn.addEventListener('click', () => pick(name));
+      resultsBox.appendChild(rowBtn);
+    });
+  };
+
+  searchInput.addEventListener('input', render);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = searchInput.value.trim().toLowerCase();
+      const first = names.find(n => n.toLowerCase().includes(q));
+      if (first) pick(first);
+    }
+  });
+
+  readSavedFilters((all) => {
+    const page = all[getSavedFiltersPageKey()] || {};
+    names = Object.keys(page).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    render();
+  });
+
+  document.body.appendChild(modal);
+  searchInput.focus();
+}
+
+function openSaveFilterModal(container) {
+  const existing = document.getElementById('cno-save-filter-modal');
+  if (existing) existing.remove();
+
+  const { modal, body, close } = createSavedFilterModal('💾 Save Filter', 440);
+  modal.id = 'cno-save-filter-modal';
+
+  const label = document.createElement('label');
+  label.textContent = 'Filter Selection Name';
+  label.style.cssText = 'font-size:0.82rem; font-weight:600; color:#475569;';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.maxLength = 60;
+  nameInput.placeholder = 'e.g. NBA props, min odds -150';
+  nameInput.style.cssText = SAVED_FILTER_INPUT_CSS;
+
+  const errorMsg = document.createElement('div');
+  errorMsg.style.cssText = 'color:#dc2626; font-size:0.8rem; min-height:1em;';
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex; justify-content:flex-end; gap:8px;';
+  const cancelBtn = makeSavedFilterModalBtn('Cancel');
+  const saveBtn = makeSavedFilterModalBtn('💾 Save', 'primary');
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(saveBtn);
+
+  const nameRow = document.createElement('div');
+  nameRow.style.cssText = 'display:flex; align-items:center; gap:4px;';
+  nameInput.style.flex = '1';
+  nameInput.style.minWidth = '0';
+
+  const searchIcon = document.createElement('button');
+  searchIcon.type = 'button';
+  searchIcon.title = 'Search existing filter selections to reuse a name (replaces that filter)';
+  searchIcon.innerHTML = `
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  `;
+  searchIcon.style.cssText = `
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    height: 34px;
+    width: 34px;
+    padding: 0;
+    cursor: pointer;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  `;
+  searchIcon.addEventListener('mouseover', () => searchIcon.style.background = '#e2e8f0');
+  searchIcon.addEventListener('mouseout', () => searchIcon.style.background = '#f1f5f9');
+  searchIcon.addEventListener('click', () => {
+    openSavedFilterNamePicker((name) => {
+      nameInput.value = name;
+      errorMsg.textContent = '';
+      nameInput.focus();
+    });
+  });
+
+  nameRow.appendChild(nameInput);
+  nameRow.appendChild(searchIcon);
+
+  body.appendChild(label);
+  body.appendChild(nameRow);
+  body.appendChild(errorMsg);
+  body.appendChild(btnRow);
+
+  const doSave = () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      errorMsg.textContent = 'Please enter a name.';
+      return;
+    }
+
+    readSavedFilters((all) => {
+      const pageKey = getSavedFiltersPageKey();
+      const page = all[pageKey] || {};
+      const existingKey = Object.keys(page).find(k => k.toLowerCase() === name.toLowerCase());
+
+      const commit = (keyName) => {
+        page[keyName] = { savedAt: Date.now(), selections: collectFilterSelections(container) };
+        all[pageKey] = page;
+        writeSavedFilters(all, () => {
+          close();
+          showSavedFilterToast(`Saved "${keyName}"`);
+        });
+      };
+
+      if (existingKey) {
+        openSavedFilterConfirm(`A filter selection named "${existingKey}" already exists. Overwrite it?`, 'Overwrite', () => commit(existingKey));
+      } else {
+        commit(name);
+      }
+    });
+  };
+
+  cancelBtn.addEventListener('click', close);
+  saveBtn.addEventListener('click', doSave);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doSave();
+    }
+  });
+
+  document.body.appendChild(modal);
+  nameInput.focus();
+}
+
+function openApplyFilterModal(container) {
+  const existing = document.getElementById('cno-apply-filter-modal');
+  if (existing) existing.remove();
+
+  const { modal, body, close } = createSavedFilterModal('📂 Apply Filters', 480);
+  modal.id = 'cno-apply-filter-modal';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Type to search saved filters...';
+  searchInput.style.cssText = SAVED_FILTER_INPUT_CSS;
+
+  const resultsBox = document.createElement('div');
+  resultsBox.style.cssText = `
+    flex: 1;
+    min-height: 120px;
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #ffffff;
+  `;
+
+  body.appendChild(searchInput);
+  body.appendChild(resultsBox);
+
+  const pageKey = getSavedFiltersPageKey();
+  let page = {};
+
+  const hint = document.createElement('div');
+  hint.textContent = 'Right-click a filter to rename it.';
+  hint.style.cssText = 'font-size:0.75rem; color:#94a3b8; margin-top:-6px;';
+  body.insertBefore(hint, resultsBox);
+
+  const renameByName = (oldName) => {
+    openSavedFilterRenameModal(oldName, (newName) => {
+      readSavedFilters((all) => {
+        const pg = all[pageKey] || {};
+        const entry = pg[oldName];
+        if (!entry) return;
+        const conflict = Object.keys(pg).find(k => k !== oldName && k.toLowerCase() === newName.toLowerCase());
+
+        const commit = () => {
+          if (conflict) delete pg[conflict];
+          delete pg[oldName];
+          pg[newName] = entry;
+          all[pageKey] = pg;
+          writeSavedFilters(all, () => {
+            page = pg;
+            render();
+            searchInput.focus();
+          });
+        };
+
+        if (conflict) {
+          openSavedFilterConfirm(`A filter selection named "${conflict}" already exists. Overwrite it?`, 'Overwrite', commit);
+        } else {
+          commit();
+        }
+      });
+    });
+  };
+
+  const sortedNames = () => Object.keys(page).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  const applyByName = (name) => {
+    const entry = page[name];
+    if (!entry) return;
+    close();
+    applyFilterSelections(container, entry.selections || {});
+  };
+
+  const deleteByName = (name) => {
+    openSavedFilterConfirm(`Delete "${name}"? This can't be undone.`, 'Delete', () => {
+      readSavedFilters((all) => {
+        if (all[pageKey]) {
+          delete all[pageKey][name];
+          if (Object.keys(all[pageKey]).length === 0) delete all[pageKey];
+        }
+        writeSavedFilters(all, () => {
+          delete page[name];
+          render();
+          searchInput.focus();
+        });
+      });
+    }, true);
+  };
+
+  const render = () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const allNames = sortedNames();
+    const names = allNames.filter(n => n.toLowerCase().includes(q));
+    resultsBox.innerHTML = '';
+
+    if (names.length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = allNames.length === 0 ? 'No saved filter selections for this page yet.' : 'No matching filter selections.';
+      empty.style.cssText = 'padding:16px; color:#64748b; font-size:0.88rem; text-align:center;';
+      resultsBox.appendChild(empty);
+      return;
+    }
+
+    names.forEach(name => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; align-items:center; border-bottom:1px solid #f1f5f9;';
+
+      const nameBtn = document.createElement('button');
+      nameBtn.type = 'button';
+      nameBtn.textContent = name;
+      nameBtn.style.cssText = 'flex:1; text-align:left; background:none; border:none; padding:10px 12px; font-size:0.92rem; color:#1e293b; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+      nameBtn.addEventListener('mouseover', () => row.style.background = '#f0f9ff');
+      nameBtn.addEventListener('mouseout', () => row.style.background = '');
+      nameBtn.addEventListener('click', () => applyByName(name));
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.title = 'Delete this saved filter';
+      delBtn.textContent = '🗑️';
+      delBtn.style.cssText = 'background:none; border:none; padding:8px 12px; font-size:1rem; cursor:pointer; flex-shrink:0;';
+      delBtn.addEventListener('mouseover', () => delBtn.style.background = '#fee2e2');
+      delBtn.addEventListener('mouseout', () => delBtn.style.background = 'none');
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteByName(name);
+      });
+
+      const transferBtn = document.createElement('button');
+      transferBtn.type = 'button';
+      transferBtn.title = 'Copy to another page';
+      transferBtn.textContent = '⇄';
+      transferBtn.style.cssText = 'background:none; border:none; padding:8px 12px; font-size:1.1rem; font-weight:bold; color:#0369a1; cursor:pointer; flex-shrink:0;';
+      transferBtn.addEventListener('mouseover', () => transferBtn.style.background = '#e0f2fe');
+      transferBtn.addEventListener('mouseout', () => transferBtn.style.background = 'none');
+      transferBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const entry = page[name];
+        if (entry) openSavedFilterTransferModal(name, entry.selections || {}, pageKey);
+      });
+
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showSavedFilterContextMenu(e.clientX, e.clientY, [
+          { label: '✏️ Rename', onClick: () => renameByName(name) }
+        ]);
+      });
+
+      row.appendChild(nameBtn);
+      row.appendChild(transferBtn);
+      row.appendChild(delBtn);
+      resultsBox.appendChild(row);
+    });
+  };
+
+  // Live search as you type
+  searchInput.addEventListener('input', render);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = searchInput.value.trim().toLowerCase();
+      const first = sortedNames().find(n => n.toLowerCase().includes(q));
+      if (first) applyByName(first);
+    }
+  });
+
+  readSavedFilters((all) => {
+    page = all[pageKey] || {};
+    render();
+  });
+
+  document.body.appendChild(modal);
+  searchInput.focus();
+}
+
+const SAVED_FILTER_PAGES = [
+  { key: 'positive-ev', label: 'Positive EV' },
+  { key: 'low-hold', label: 'Low Hold' },
+  { key: 'free-bet-converter', label: 'Free Bet Converter' },
+  { key: 'odds-boost', label: 'Odds Boost' },
+  { key: 'risk-free-bet', label: 'Risk-Free Bet' },
+  { key: 'win-and-get', label: 'Win and Get' },
+  { key: 'bet-and-get', label: 'Bet and Get' }
+];
+
+// Returns a copy of the saved selections limited to fields that exist on the destination page
+function filterSelectionsForPage(selections, destKey) {
+  const sel = JSON.parse(JSON.stringify(selections || {}));
+  const dropped = [];
+  const hasBoost = destKey === 'odds-boost';
+  const hasReward = ['risk-free-bet', 'win-and-get', 'bet-and-get'].includes(destKey);
+
+  if (!hasBoost) {
+    if (sel.radios && sel.radios.boostType) {
+      delete sel.radios.boostType;
+      dropped.push('Boost type');
+    }
+    if (sel.boost) {
+      if ((sel.boost.pct || '').trim() !== '' || (sel.boost.odds || '').trim() !== '') dropped.push('Boost amount');
+      delete sel.boost;
+    }
+  }
+
+  if (!hasReward) {
+    if (sel.texts && sel.texts.TextBoxReward !== undefined) {
+      if (String(sel.texts.TextBoxReward).trim() !== '') dropped.push('Reward %');
+      delete sel.texts.TextBoxReward;
+    }
+    const hadConversion = (sel.radios && sel.radios.conversion) ||
+                          (sel.texts && sel.texts.TextBoxFreeCreditConversionRate !== undefined);
+    if (sel.radios) delete sel.radios.conversion;
+    if (sel.texts) delete sel.texts.TextBoxFreeCreditConversionRate;
+    if (hadConversion) dropped.push('Free credit conversion rate');
+  }
+
+  return { selections: sel, dropped };
+}
+
+function showSavedFilterContextMenu(x, y, items) {
+  const old = document.getElementById('cno-sf-context-menu');
+  if (old) old.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'cno-sf-context-menu';
+  menu.style.cssText = `
+    position: fixed; left: ${x}px; top: ${y}px; z-index: 1000002;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18); padding: 4px; min-width: 120px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+  const closeMenu = () => {
+    menu.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onOutside = (e) => { if (!menu.contains(e.target)) closeMenu(); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeMenu(); } };
+
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = item.label;
+    btn.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; padding:7px 10px; font-size:0.88rem; color:#1e293b; cursor:pointer; border-radius:4px;';
+    btn.addEventListener('mouseover', () => btn.style.background = '#f0f9ff');
+    btn.addEventListener('mouseout', () => btn.style.background = 'none');
+    btn.addEventListener('click', () => {
+      closeMenu();
+      item.onClick();
+    });
+    menu.appendChild(btn);
+  });
+
+  document.body.appendChild(menu);
+
+  // Keep the menu on screen
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = `${Math.max(0, window.innerWidth - rect.width - 4)}px`;
+  if (rect.bottom > window.innerHeight) menu.style.top = `${Math.max(0, window.innerHeight - rect.height - 4)}px`;
+
+  document.addEventListener('mousedown', onOutside, true);
+  document.addEventListener('keydown', onKey, true);
+}
+
+function openSavedFilterRenameModal(oldName, onSubmit) {
+  const { modal, body, close } = createSavedFilterModal('✏️ Rename Filter Selection', 420, 1000000);
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.maxLength = 60;
+  nameInput.value = oldName;
+  nameInput.style.cssText = SAVED_FILTER_INPUT_CSS;
+
+  const errorMsg = document.createElement('div');
+  errorMsg.style.cssText = 'color:#dc2626; font-size:0.8rem; min-height:1em;';
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex; justify-content:flex-end; gap:8px;';
+  const cancelBtn = makeSavedFilterModalBtn('Cancel');
+  const okBtn = makeSavedFilterModalBtn('Rename', 'primary');
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(okBtn);
+
+  body.appendChild(nameInput);
+  body.appendChild(errorMsg);
+  body.appendChild(btnRow);
+
+  const submit = () => {
+    const newName = nameInput.value.trim();
+    if (!newName) {
+      errorMsg.textContent = 'Please enter a name.';
+      return;
+    }
+    if (newName === oldName) {
+      close();
+      return;
+    }
+    close();
+    onSubmit(newName);
+  };
+
+  cancelBtn.addEventListener('click', close);
+  okBtn.addEventListener('click', submit);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  document.body.appendChild(modal);
+  nameInput.focus();
+  nameInput.select();
+}
+
+function openSavedFilterTransferModal(name, selections, currentKey) {
+  const { modal, body, close } = createSavedFilterModal('⇄ Copy to Another Page', 400, 1000000);
+
+  const intro = document.createElement('div');
+  intro.textContent = `Copy "${name}" to which page?`;
+  intro.style.cssText = 'font-size:0.9rem; color:#334155;';
+  body.appendChild(intro);
+
+  const list = document.createElement('div');
+  list.style.cssText = 'border:1px solid #e2e8f0; border-radius:6px; overflow-y:auto; max-height:320px;';
+  body.appendChild(list);
+
+  const doCopy = (dest) => {
+    readSavedFilters((all) => {
+      const { selections: filtered, dropped } = filterSelectionsForPage(selections, dest.key);
+      const destPage = all[dest.key] || {};
+      const existingKey = Object.keys(destPage).find(k => k.toLowerCase() === name.toLowerCase());
+
+      const commit = (keyName) => {
+        destPage[keyName] = { savedAt: Date.now(), selections: filtered };
+        all[dest.key] = destPage;
+        writeSavedFilters(all, () => {
+          let msg = `Copied "${keyName}" to ${dest.label}.`;
+          if (dropped.length) msg += ` Not carried over: ${dropped.join(', ')}.`;
+          showSavedFilterToast(msg);
+
+          openSavedFilterConfirm(`Go to ${dest.label} and apply "${keyName}" now?`, 'Go to page', () => {
+            try {
+              sessionStorage.setItem(PENDING_FILTER_APPLY_KEY, JSON.stringify({ pageKey: dest.key, name: keyName, ts: Date.now() }));
+            } catch (e) { /* ignore */ }
+            window.location.href = `${window.location.origin}/site/tools/${dest.key}.aspx`;
+          }, false, 'Stay here');
+        });
+      };
+
+      if (existingKey) {
+        openSavedFilterConfirm(`${dest.label} already has a filter selection named "${existingKey}". Overwrite it?`, 'Overwrite', () => commit(existingKey));
+      } else {
+        commit(name);
+      }
+    });
+  };
+
+  SAVED_FILTER_PAGES.filter(p => p.key !== currentKey).forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = p.label;
+    btn.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid #f1f5f9; padding:10px 12px; font-size:0.92rem; color:#1e293b; cursor:pointer;';
+    btn.addEventListener('mouseover', () => btn.style.background = '#f0f9ff');
+    btn.addEventListener('mouseout', () => btn.style.background = 'none');
+    btn.addEventListener('click', () => {
+      close();
+      doCopy(p);
+    });
+    list.appendChild(btn);
+  });
+
+  document.body.appendChild(modal);
+}
+
+function ensureSavedFilterButtons(btnGroup, clearBtn) {
+  if (!btnGroup || !clearBtn) return;
+
+  let applyBtn = document.getElementById('cno-apply-filters-btn');
+  if (!applyBtn) {
+    applyBtn = document.createElement('button');
+    applyBtn.id = 'cno-apply-filters-btn';
+    applyBtn.type = 'button';
+    applyBtn.style.cssText = SAVED_FILTER_BTN_CSS;
+    applyBtn.textContent = '📂 Apply Filters';
+    applyBtn.onclick = (e) => {
+      e.stopPropagation();
+      openApplyFilterModal(getFilterAccordionContainer() || document);
+    };
+  }
+
+  let saveBtn = document.getElementById('cno-save-filters-btn');
+  if (!saveBtn) {
+    saveBtn = document.createElement('button');
+    saveBtn.id = 'cno-save-filters-btn';
+    saveBtn.type = 'button';
+    // ~half a button of extra space before Clear Filters (plus the group's 6px gap)
+    saveBtn.style.cssText = SAVED_FILTER_BTN_CSS + ' margin-right: 44px;';
+    saveBtn.textContent = '💾 Save Filter';
+    saveBtn.onclick = (e) => {
+      e.stopPropagation();
+      openSaveFilterModal(getFilterAccordionContainer() || document);
+    };
+  }
+
+  if (!btnGroup.contains(applyBtn) || !btnGroup.contains(saveBtn)) {
+    btnGroup.insertBefore(applyBtn, clearBtn);
+    btnGroup.insertBefore(saveBtn, clearBtn);
+  }
+}
+
+// ====================================================
+// APPLY A FILTER AFTER "COPY TO ANOTHER PAGE -> GO TO PAGE"
+// ====================================================
+
+const PENDING_FILTER_APPLY_KEY = 'cno_pending_filter_apply';
+
+function processPendingFilterApply() {
+  let raw = null;
+  try { raw = sessionStorage.getItem(PENDING_FILTER_APPLY_KEY); } catch (e) { return; }
+  if (!raw) return;
+
+  let pending = null;
+  try { pending = JSON.parse(raw); } catch (e) { /* fall through */ }
+  if (!pending || !pending.pageKey || !pending.name || (Date.now() - (pending.ts || 0)) > 120000) {
+    sessionStorage.removeItem(PENDING_FILTER_APPLY_KEY);
+    return;
+  }
+
+  if (pending.pageKey !== getSavedFiltersPageKey()) return;
+
+  const container = getFilterAccordionContainer();
+  if (!container || !container.classList.contains('cno-ready')) return;
+  if (!container.querySelector('[id$="DropDownListLeague"]')) return;
+
+  // Clear first so this only ever runs once
+  sessionStorage.removeItem(PENDING_FILTER_APPLY_KEY);
+
+  readSavedFilters((all) => {
+    const entry = (all[pending.pageKey] || {})[pending.name];
+    if (!entry) {
+      showSavedFilterToast(`Couldn't find the filter "${pending.name}" on this page.`);
+      return;
+    }
+    applyFilterSelections(container, entry.selections || {});
+  });
+}
+
+// ====================================================
+// KEYBOARD SHORTCUT FOR THE UPDATE BUTTON (Ctrl+Alt+R on Windows/Linux, Ctrl+Cmd+R on Mac)
+// ====================================================
+
+const CNO_UPDATE_BUTTON_ID_SUFFIX = 'ButtonUpdate';
+
+function cnoIsMac() {
+  const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  return /mac/i.test(plat);
+}
+
+function cnoUpdateShortcutLabel() {
+  return cnoIsMac() ? 'Ctrl+\u2318+R' : 'Ctrl+Alt+R';
+}
+
+function cnoGetActiveUpdateButton() {
+  const btn = document.querySelector('input[type="submit"][id$="' + CNO_UPDATE_BUTTON_ID_SUFFIX + '"]');
+  if (!btn || btn.disabled) return null;
+  if (btn.offsetParent === null || getComputedStyle(btn).display === 'none') return null;
+  return btn;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyR' || e.repeat) return;
+
+  const matches = cnoIsMac()
+    ? (e.ctrlKey && e.metaKey && !e.altKey && !e.shiftKey)
+    : (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey);
+  if (!matches) return;
+
+  if (!cnoGetActiveUpdateButton()) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+  triggerFilterUpdate(getFilterAccordionContainer() || document);
+}, true);
+
+// ---- Tooltip hint above the Update button (delegated, so it survives the page's partial refreshes) ----
+
+function cnoHideUpdateHint() {
+  const tip = document.getElementById('cno-update-hint');
+  if (tip) tip.remove();
+}
+
+function cnoShowUpdateHint(btn) {
+  cnoHideUpdateHint();
+
+  const tip = document.createElement('div');
+  tip.id = 'cno-update-hint';
+  tip.textContent = `Shortcut: ${cnoUpdateShortcutLabel()}`;
+  tip.style.cssText = `
+    position: fixed; z-index: 1000001; pointer-events: none;
+    background: #0f172a; color: #ffffff; padding: 4px 8px; border-radius: 4px;
+    font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  `;
+  document.body.appendChild(tip);
+
+  const rect = btn.getBoundingClientRect();
+  const left = Math.max(6, Math.min(rect.left + rect.width / 2 - tip.offsetWidth / 2, window.innerWidth - tip.offsetWidth - 6));
+  let top = rect.top - tip.offsetHeight - 6;
+  if (top < 4) top = rect.bottom + 6;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+}
+
+function cnoUpdateButtonFromEvent(e) {
+  const el = e.target && e.target.closest ? e.target.closest('input[type="submit"]') : null;
+  if (el && el.id && el.id.endsWith(CNO_UPDATE_BUTTON_ID_SUFFIX)) return el;
+  return null;
+}
+
+document.addEventListener('mouseover', (e) => {
+  const btn = cnoUpdateButtonFromEvent(e);
+  if (btn && !btn.disabled) cnoShowUpdateHint(btn);
+});
+document.addEventListener('mouseout', (e) => {
+  if (cnoUpdateButtonFromEvent(e)) cnoHideUpdateHint();
+});
+document.addEventListener('click', (e) => {
+  if (cnoUpdateButtonFromEvent(e)) cnoHideUpdateHint();
+}, true);
+window.addEventListener('scroll', cnoHideUpdateHint, true);
+
+// ====================================================
+// "FILTER TO THIS EVENT" ICON NEXT TO EVENT NAMES IN THE TABLES
+// ====================================================
+
+const EVENT_FILTER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="display:block;"><path d="M3 4h18l-7 8.5V20l-4-2v-5.5L3 4z"/></svg>`;
+
+function getCleanEventText(link) {
+  const clone = link.cloneNode(true);
+  clone.querySelectorAll('.cno-ap-rank, .cno-weather-badge, .cno-injury-badge, .cno-badge, .cno-event-filter-btn').forEach(el => el.remove());
+  return clone.textContent
+    .replace(/\(#\d+\)/g, '')   // belt-and-braces: drop any AP rank text such as "(#14)"
+    .replace(/"/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function applyEventFilter(eventText) {
+  const elEvent = document.querySelector('[id$="TextBoxEventNameContains"]');
+  if (!elEvent || !eventText) return;
+
+  // Clear anything else in the box, including the Top 25 helper state
+  sessionStorage.removeItem(AP_TOP25_STORAGE_KEY);
+  sessionStorage.removeItem('cno_top25_cb_active');
+  const top25Cb = document.querySelector('#cno-top25-cb');
+  if (top25Cb) top25Cb.checked = false;
+
+  elEvent.value = `"${eventText}"`;
+  elEvent.dispatchEvent(new Event('input', { bubbles: true }));
+
+  triggerFilterUpdate(getFilterAccordionContainer() || document);
+}
+
+function processEventFilterIcons() {
+  if (!document.querySelector('[id$="TextBoxEventNameContains"]')) return;
+
+  document.querySelectorAll('a[href*="game.aspx"]').forEach(link => {
+    if (!link.textContent.includes('@')) return;
+    if (link.closest('#cno-update-banner-alert')) return;
+
+    const next = link.nextElementSibling;
+    if (next && next.classList && next.classList.contains('cno-event-filter-btn')) return;
+
+    const btn = document.createElement('span');
+    btn.className = 'cno-event-filter-btn';
+    btn.setAttribute('role', 'button');
+    btn.title = 'Filter to this event';
+    btn.innerHTML = EVENT_FILTER_ICON_SVG;
+    btn.style.cssText = 'display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; padding:2px; color:#0284c7; cursor:pointer; border-radius:3px;';
+    btn.addEventListener('mouseover', () => { btn.style.background = '#e0f2fe'; });
+    btn.addEventListener('mouseout', () => { btn.style.background = 'none'; });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      applyEventFilter(getCleanEventText(link));
+    });
+
+    link.insertAdjacentElement('afterend', btn);
+  });
 }

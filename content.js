@@ -3,6 +3,8 @@
 // ====================================================
 
 refreshUserSettings(() => {
+  processAccordionPanes();
+  applyModernUiClass();
   Promise.all([loadAllInjuryData(), loadAPRankings(), loadMLBWeatherData(), loadMarketSheetsData()]).then(() => {
     runAll();
     scheduleNextInjuryDataLoad();
@@ -33,6 +35,12 @@ processUpdateBannerAlert(); // Added update banner check
   processPlayerTableRefreshTimestamp();
   processAPRankings();
   processMLBWeatherBadges();
+  processNoticeDismiss();
+  processAccordionPanes();
+  applyModernUiClass();
+  processModernSpacing();
+  processPendingFilterApply();
+  processEventFilterIcons();
 }
 
 setInterval(runAll, 500);

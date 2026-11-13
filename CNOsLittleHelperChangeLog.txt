@@ -1,3 +1,22 @@
+1.1.8
+FEATURE ADDITIONS:
+--Ability to save filters for each page  (E.g., save a preset for DraftKings NBA Player Props with over or yes in the name), transfer to other pages, rename, delete, etc.
+--Add "Check Injury Status on Google" link to injury badges
+--Added "Filter to this event" link next to all games
+--Added ability to switch to all pages (EV, Odds Boost, Free Bet, etc.) with current selections preserved
+--Added shortcut on all pages for the Update/refresh data action (Ctrl+Alt+R or Ctrl+⌘+R)
+--Removed % odds badge everywhere except calc page because Mike added native % odds to CNO
+--Added Bug Fix and Feature Request submission forms
+--Option to hide "Share Link" and "Readme" accordion pane (off by default)	
+--Add option to "X" out of CrazyNinjaMike's message (will still show new messages)
+--Various cosmetic improvements including reducing white space
+
+BUG FIXES:
+--Fix for missing injury badges in odds boost, free bet, risk free bet, win & get, bet & get
+--Fix FV % odd badge on calc page
+--Fixes to GitHub update check
+--Fix for issue with NCAAB/NCAAF rank displaying for similar named teams (e.g., mistaking Central Arkansas for Arkansas). Note: this was not an issue for the "top 25 only" filter.
+
 1.1.7
 --Added GitHub checking for updates
 
