@@ -86,3 +86,128 @@ html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGr
 html.cno-modern-ui .cno-support-callout {
   margin: 6px 0 8px 0;
 }
+
+/* ====================================================
+   HOVER ICONS (filter / QR)
+   In the results table they sit in a tray that floats over the cell's right edge, so they
+   never take up layout space (no extra wrapped line). Elsewhere they stay inline.
+   ==================================================== */
+.cno-hover-filter-btn {
+  visibility: hidden;
+}
+
+a:hover + .cno-event-filter-btn,
+.footable-row-detail-inner > div:hover .cno-hover-filter-btn,
+.cno-hover-filter-btn:hover {
+  visibility: visible;
+}
+
+td.cno-has-hover-tray {
+  position: relative;
+}
+
+.cno-hover-tray {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  white-space: nowrap;
+}
+
+tr:not(.footable-row-detail) > td:hover > .cno-hover-tray {
+  display: inline-flex;
+}
+
+.cno-hover-tray .cno-hover-filter-btn {
+  visibility: visible;
+  margin-left: 0 !important;
+}
+
+.cno-hover-tray .cno-qr-btn {
+  margin-left: 4px !important;
+}
+
+/* ====================================================
+   MODERN CALC BUTTON (only when Modernized Filter Panel UI is on)
+   ==================================================== */
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 input[type="button"][value="Calc"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #0284c7;
+  color: #ffffff;
+  border: 1px solid #0369a1;
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 input[type="button"][value="Calc"]:hover {
+  background-color: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(2, 132, 199, 0.3);
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 input[type="button"][value="Calc"]:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ====================================================
+   HEDGE SPORTSBOOK FILTER (rows hidden client-side)
+   ==================================================== */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-injured-hidden,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-hedge-hidden {
+  display: none !important;
+}
+
+/* ====================================================
+   "OPEN IN DEVIGGER" BUTTON IN THE CALC POPUP (matches the extension's other blue buttons)
+   ==================================================== */
+a.cno-devigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #0284c7;
+  color: #ffffff !important;
+  border: 1px solid #0369a1;
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none !important;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+a.cno-devigger-btn:hover {
+  background-color: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(2, 132, 199, 0.3);
+}
+
+a.cno-devigger-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Option: hide the unused "Extra" column */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .cno-col-hidden {
+  display: none !important;
+}

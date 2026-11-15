@@ -1,3 +1,26 @@
+1.2.1
+FEATURE ADDITIONS:
+--QR code button on Sportsbook cells (including Hedge Bet Sportsbook) to open the bet link on your phone
+--Hover filter icons on  Sport, League, Market, Bet Name, Event and Sportsbook cells (Bet Name uses just the player/team name)
+--On Positive EV page, Right-click the Calc button to "Open in Devigger" (on pages with Odds and Fair Odds columns)
+--Hedge Bet Sportsbook filter icon: shows only rows with that hedge book (stays through Update until X'd out or the page is reloaded)
+--Option to remove Extra column when it is unused (off by default)
+--Various layout and UI modernization tweaks
+--Odds Boost page now starts with the cursor in the Boost amount box
+--Added shortcut for Clear Filters (Ctrl+Alt+C or Ctrl+⌘+C), shown on hover
+--Hovering Apply Filters now shows a quick-apply menu of your 10 most-used saved filters for that page, plus "Show / Manage All Filters"
+
+BUG FIXES:
+--Fixed tabbing between boxes in Classic View (with the modernized filter panel on)
+--Added missing filter icons (event, market, name, sportsbook) on the Arbitrage page
+--Fixed blank Sort By options when Profit Strategy is set to Hedge (modern UI)
+--Removed "Open in Devigger" from two-bet Calc popups (Low Hold, Arbitrage, Hedge), which have no fair value
+--Saved filters now include Minimum Liquidity, Mainlines Only, and Mainlines Only for Hedge Book
+--Clear Filters now also clears Minimum Liquidity, Mainlines Only, and Mainlines Only for Hedge Book
+
+1.1.9
+Fixed incorrect version number in 1.1.8 lol
+
 1.1.8
 FEATURE ADDITIONS:
 --Ability to save filters for each page  (E.g., save a preset for DraftKings NBA Player Props with over or yes in the name), transfer to other pages, rename, delete, etc.

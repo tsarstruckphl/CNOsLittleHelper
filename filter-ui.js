@@ -182,18 +182,23 @@ function updateTop25CheckboxState(container = document) {
 
 function prepareAndExecuteUpdate(container = document) {
   const elBetContains = document.querySelector('[id$="TextBoxBetNameContains"]');
-  const elExcludeCb = document.querySelector('#cno-exclude-injured-cb');
+  const elInjuredOnlyCb = document.querySelector('#cno-injured-only-cb');
 
   if (elBetContains) {
     const currentVal = elBetContains.value;
 
-    if (elExcludeCb && elExcludeCb.checked && !elExcludeCb.disabled) {
+    // "Injured Only": add the injured players' full names (alphabetical) for this Update only;
+    // the user's own text is kept in sessionStorage and put back after the results load.
+    // ("Exclude" doesn't touch the text box: it hides matching rows after the results load.)
+    if (elInjuredOnlyCb && elInjuredOnlyCb.checked && !elInjuredOnlyCb.disabled) {
       if (sessionStorage.getItem(BET_CONTAINS_STORAGE_KEY) === null) {
         sessionStorage.setItem(BET_CONTAINS_STORAGE_KEY, currentVal);
       }
       const selectedCategory = getSelectedLeagueName(container);
-      const names = typeof getInjuredPlayerNames === 'function' ? getInjuredPlayerNames(selectedCategory, 'full') : [];
-      elBetContains.value = buildExcludeInjuredSyntax(sessionStorage.getItem(BET_CONTAINS_STORAGE_KEY), names);
+      const names = (typeof getInjuredPlayerNames === 'function' ? getInjuredPlayerNames(selectedCategory, 'full') : [])
+        .slice()
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      elBetContains.value = buildInjectInjuredSyntax(sessionStorage.getItem(BET_CONTAINS_STORAGE_KEY), names);
     } else {
       sessionStorage.removeItem(BET_CONTAINS_STORAGE_KEY);
     }
@@ -366,29 +371,43 @@ function bindSportLeagueMutualExclusion(elSport, elLeague, container = document)
   }
 }
 
+function isExcludeInjuredLeagueAllowed(container = document) {
+  const leagueName = getSelectedLeagueName(container);
+  return leagueName === 'ALL' || VALID_INJURY_LEAGUES.includes(leagueName);
+}
+
+// Exclude: enabled for All + MLB/NBA/NFL/WNBA. Injured Only: enabled for MLB/NBA/NFL/WNBA only.
 function updateExcludeInjuredCheckboxState(container = document) {
-  const cb = container.querySelector('#cno-exclude-injured-cb') || document.querySelector('#cno-exclude-injured-cb');
-  const cbWrap = container.querySelector('.cno-exclude-injured-wrapper') || document.querySelector('.cno-exclude-injured-wrapper');
-  if (!cb || !cbWrap) return;
+  const setState = (cbId, enabled, enabledTip, disabledTip) => {
+    const cb = container.querySelector(`#${cbId}`) || document.querySelector(`#${cbId}`);
+    if (!cb) return;
+    const wrap = cb.closest('label') || cb.parentElement;
+    if (!enabled) {
+      cb.checked = false;
+      cb.disabled = true;
+      if (wrap) {
+        wrap.title = disabledTip;
+        wrap.style.opacity = '0.5';
+        wrap.style.cursor = 'not-allowed';
+      }
+      cb.style.cursor = 'not-allowed';
+    } else {
+      cb.disabled = false;
+      if (wrap) {
+        wrap.title = enabledTip;
+        wrap.style.opacity = '1.0';
+        wrap.style.cursor = 'pointer';
+      }
+      cb.style.cursor = 'pointer';
+    }
+  };
 
-  const isEligible = isEligibleInjuryLeagueSelected(container);
-  const disabledTooltip = "Select MLB, NBA, NFL, or WNBA from league to enable; right-click to filter to only injured players";
-  const enabledTooltip = "Right-click to filter to filter to only injured players";
-
-  if (!isEligible) {
-    cb.checked = false;
-    cb.disabled = true;
-    cbWrap.title = disabledTooltip;
-    cbWrap.style.opacity = '0.5';
-    cbWrap.style.cursor = 'not-allowed';
-    cb.style.cursor = 'not-allowed';
-  } else {
-    cb.disabled = false;
-    cbWrap.title = enabledTooltip;
-    cbWrap.style.opacity = '1.0';
-    cbWrap.style.cursor = 'pointer';
-    cb.style.cursor = 'pointer';
-  }
+  setState('cno-exclude-injured-cb', isExcludeInjuredLeagueAllowed(container),
+    'Hide rows for players on the injury report (MLB, NBA, NFL, WNBA rows)',
+    'Select All, MLB, NBA, NFL, or WNBA from League to enable');
+  setState('cno-injured-only-cb', isEligibleInjuryLeagueSelected(container),
+    "Only show bets on players on the selected league's injury report",
+    'Select MLB, NBA, NFL, or WNBA from League to enable');
 }
 
 function updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookWrapper, hedgeMainWrapper, sortByWrapper = null) {
@@ -615,6 +634,10 @@ function clearAllPageFilters(container = document) {
   if (elExcludeCb) {
     elExcludeCb.checked = false;
   }
+  const elInjuredOnlyCb = container.querySelector('#cno-injured-only-cb') || document.querySelector('#cno-injured-only-cb');
+  if (elInjuredOnlyCb) {
+    elInjuredOnlyCb.checked = false;
+  }
 
   const elTop25Cb = container.querySelector('#cno-top25-cb') || document.querySelector('#cno-top25-cb');
   if (elTop25Cb) {
@@ -624,6 +647,25 @@ function clearAllPageFilters(container = document) {
   const elIsLive = getEl('CheckBoxIsLive');
   if (elIsLive) {
     elIsLive.checked = false;
+  }
+
+  // Minimum Liquidity: the site's default is blank on every page
+  const elMinLiq = getEl('TextBoxMinimumLiquidity');
+  if (elMinLiq) {
+    elMinLiq.value = '';
+    elMinLiq.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // Mainlines Only / Mainlines Only for Hedge Book
+  const elIsMain = getEl('CheckBoxIsMain');
+  if (elIsMain && elIsMain.checked) {
+    elIsMain.checked = false;
+    elIsMain.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const elHedgeIsMain = getEl('CheckBoxHedgeBook_IsMain');
+  if (elHedgeIsMain && elHedgeIsMain.checked) {
+    elHedgeIsMain.checked = false;
+    elHedgeIsMain.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   if (isOddsBoostPage) {
@@ -756,6 +798,9 @@ function setupFilterToggle() {
       gap: 5px;
     `;
     clearBtn.innerHTML = `${ERASER_SVG_ICON} Clear Filters`;
+    clearBtn.addEventListener('mouseenter', () => cnoShowUpdateHint(clearBtn, `Shortcut: ${cnoClearShortcutLabel()}`));
+    clearBtn.addEventListener('mouseleave', cnoHideUpdateHint);
+    clearBtn.addEventListener('click', cnoHideUpdateHint);
     clearBtn.onclick = (e) => {
       e.stopPropagation();
       const container = getFilterAccordionContainer() || 
@@ -788,7 +833,7 @@ function setupFilterToggle() {
       switchBtn = document.createElement('button');
       switchBtn.id = 'cno-switch-page-btn';
       switchBtn.type = 'button';
-      switchBtn.textContent = '🔀 Switch Page ▾';
+      switchBtn.textContent = '🔀 Swap Page ▾';
       switchBtn.style.cssText = `
         padding: 3px 10px;
         font-size: 0.8rem;
@@ -841,6 +886,7 @@ function setupFilterToggle() {
                       document.getElementById('cno-games-filter-wrapper');
     if (container) {
       delete container.dataset.restyled;
+      delete container.dataset.cnoClassicApplied;
       if (newClassicState) {
         revertToClassicView(container);
       } else {
@@ -891,9 +937,20 @@ function setupFilterToggle() {
 }
 
 function revertToClassicView(container) {
+  // restyleFilterPanel() runs every 500ms. Rebuilding the panel each time replaced the focused
+  // box, which broke tabbing (and could wipe typed text), so only rebuild it once.
+  if (container.dataset.cnoClassicApplied === 'true') {
+    container.classList.add('cno-ready');
+    return;
+  }
+
   if (container.dataset.originalHTML) {
     container.innerHTML = container.dataset.originalHTML;
   }
+  container.dataset.cnoClassicApplied = 'true';
+
+  // The saved markup can carry "already bound" markers from before; clear them so Enter-to-update binds again
+  container.querySelectorAll('[data-has-enter-submit]').forEach(el => el.removeAttribute('data-has-enter-submit'));
 
   const radios = container.querySelectorAll('input[type="radio"]');
   radios.forEach(radio => {
@@ -913,7 +970,8 @@ function removeAllTextNodes(element) {
   childNodes.forEach(node => {
     if (node.nodeType === Node.TEXT_NODE) {
       node.remove();
-    } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== 'SCRIPT') {
+    } else if (node.nodeType === Node.ELEMENT_NODE && !['SCRIPT', 'SELECT', 'OPTION', 'OPTGROUP', 'TEXTAREA'].includes(node.tagName)) {
+      // Dropdown option labels are text nodes too; stripping them left the Sort By list blank
       removeAllTextNodes(node);
     }
   });
@@ -1039,105 +1097,61 @@ function createBetNameWithExcludeInjuredField(labelText, inputEl, isImportant = 
     inputRow.appendChild(clearBtn);
 
     if (typeof userSettings !== 'undefined' && userSettings.enableInjuryBadges) {
-      const cbWrap = document.createElement('label');
-      cbWrap.className = 'cno-exclude-injured-wrapper';
-      cbWrap.style.cssText = `
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-        font-size: 0.76rem !important;
-        font-weight: 600 !important;
-        color: #334155 !important;
-        line-height: 1.1;
-        width: 105px;
-        flex-shrink: 0;
-        user-select: none;
-        margin-left: 2px;
+      // Two lines:   Injury Filter
+      //              [ ] Exclude   [ ] Injured Only
+      const injuryBlock = document.createElement('div');
+      injuryBlock.className = 'cno-injury-filter-block';
+      injuryBlock.style.cssText = `
+        display: flex; flex-direction: column; justify-content: center; gap: 2px;
+        flex-shrink: 0; margin-left: 4px; user-select: none; line-height: 1.1;
       `;
 
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.id = 'cno-exclude-injured-cb';
-      cb.checked = false;
-      cb.style.cssText = 'width: 14px; height: 14px; accent-color: #0284c7; cursor: pointer; flex-shrink: 0; margin: 0;';
+      const heading = document.createElement('div');
+      heading.textContent = 'Injury Filter';
+      heading.style.cssText = 'font-size: 0.7rem !important; font-weight: 700 !important; color: #64748b !important; text-align: center; white-space: nowrap;';
 
-      const labelSpan = document.createElement('span');
-      labelSpan.textContent = 'Exclude Injured Players (slow)';
-      labelSpan.style.cssText = 'display: inline-block; word-break: break-word;';
+      const cbRow = document.createElement('div');
+      cbRow.style.cssText = 'display: flex; align-items: center; gap: 8px; white-space: nowrap;';
 
-      cbWrap.appendChild(cb);
-      cbWrap.appendChild(labelSpan);
-
-      const triggerInjuredContextMenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!isEligibleInjuryLeagueSelected(container)) {
-          return;
-        }
-
-        const existingMenu = document.getElementById('cno-injured-context-menu');
-        if (existingMenu) existingMenu.remove();
-
-        const menu = document.createElement('div');
-        menu.id = 'cno-injured-context-menu';
-        menu.style.cssText = `
-          position: fixed;
-          top: ${e.clientY}px;
-          left: ${e.clientX}px;
-          background: #ffffff;
-          border: 1px solid #cbd5e1;
-          border-radius: 6px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-          z-index: 999999;
-          padding: 4px 0;
-          min-width: 260px;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      const makeCb = (id, text) => {
+        const lbl = document.createElement('label');
+        lbl.className = id === 'cno-exclude-injured-cb' ? 'cno-exclude-injured-wrapper' : 'cno-injured-only-wrapper';
+        lbl.style.cssText = `
+          display: inline-flex; align-items: center; gap: 3px; cursor: pointer; margin: 0;
+          font-size: 0.76rem !important; font-weight: 600 !important; color: #334155 !important;
         `;
-
-        const createMenuItem = (title, mode) => {
-          const item = document.createElement('div');
-          item.textContent = title;
-          item.style.cssText = `
-            padding: 6px 12px;
-            color: #0369a1;
-            font-weight: 600;
-            font-size: 0.82rem;
-            cursor: pointer;
-            user-select: none;
-          `;
-
-          item.addEventListener('mouseover', () => item.style.background = '#f0f9ff');
-          item.addEventListener('mouseout', () => item.style.background = 'transparent');
-
-          item.addEventListener('click', () => {
-            const selectedCategory = getSelectedLeagueName(container);
-            const names = typeof getInjuredPlayerNames === 'function' ? getInjuredPlayerNames(selectedCategory, mode) : [];
-            inputEl.value = buildInjectInjuredSyntax(inputEl.value, names);
-            menu.remove();
-          });
-
-          return item;
-        };
-
-        menu.appendChild(createMenuItem('Filter to only injured players by last name', 'last'));
-        menu.appendChild(createMenuItem('Filter to only injured players by full name', 'full'));
-        document.body.appendChild(menu);
-
-        const closeMenu = (evt) => {
-          if (!menu.contains(evt.target)) {
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
-          }
-        };
-        setTimeout(() => document.addEventListener('click', closeMenu), 50);
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = id;
+        cb.checked = false;
+        cb.style.cssText = 'width: 14px; height: 14px; accent-color: #0284c7; cursor: pointer; flex-shrink: 0; margin: 0;';
+        const span = document.createElement('span');
+        span.textContent = text;
+        lbl.appendChild(cb);
+        lbl.appendChild(span);
+        return { lbl, cb };
       };
 
-      cbWrap.addEventListener('contextmenu', triggerInjuredContextMenu);
-      cb.addEventListener('contextmenu', triggerInjuredContextMenu);
+      const exclude = makeCb('cno-exclude-injured-cb', 'Exclude');
+      const injuredOnly = makeCb('cno-injured-only-cb', 'Injured Only');
 
-      inputRow.appendChild(cbWrap);
+      // The two are opposites, so checking one unchecks the other
+      exclude.cb.addEventListener('change', () => {
+        if (exclude.cb.checked) injuredOnly.cb.checked = false;
+        processInjuredRowExclusion(); // hide/show rows right away, no Update needed
+      });
+      injuredOnly.cb.addEventListener('change', () => {
+        if (injuredOnly.cb.checked) {
+          exclude.cb.checked = false;
+          processInjuredRowExclusion();
+        }
+      });
+
+      cbRow.appendChild(exclude.lbl);
+      cbRow.appendChild(injuredOnly.lbl);
+      injuryBlock.appendChild(heading);
+      injuryBlock.appendChild(cbRow);
+      inputRow.appendChild(injuryBlock);
     }
 
     wrapper.appendChild(inputRow);
@@ -1781,16 +1795,6 @@ function restyleFilterPanel() {
 
     const panelHedge = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_Panel_ProfitStrategy_Hedge');
     const panelEV = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_Panel_ProfitStrategy_EV');
-
-    if (elSortByFB) {
-      const currVal = elSortByFB.value || "1";
-      elSortByFB.options.length = 0;
-      const opt1 = new Option("Conversion%", "1");
-      const opt2 = new Option("EV%", "2");
-      elSortByFB.add(opt1);
-      elSortByFB.add(opt2);
-      elSortByFB.value = currVal;
-    }
 
     if (panelHedge) {
       removeAllTextNodes(panelHedge);
@@ -2454,7 +2458,8 @@ function collectFilterSelections(container = document) {
   [
     'TextBoxMinimumOdds', 'TextBoxMaximumOdds', 'TextBoxEventNameContains', 'TextBoxMaximumDateHours',
     'TextBoxMarketNameContains', 'TextBoxBetNameContains', 'TextBoxMinimumBetPoints', 'TextBoxMaximumBetPoints',
-    'TextBoxReward', 'TextBoxFreeCreditConversionRate'
+    'TextBoxReward', 'TextBoxFreeCreditConversionRate', 'TextBoxMinimumLiquidity',
+    'TextBoxMinimumOddsProviderCount' // Minimum Books
   ].forEach(suffix => {
     const el = getEl(suffix);
     if (el) sel.texts[suffix] = el.value;
@@ -2462,9 +2467,10 @@ function collectFilterSelections(container = document) {
 
   // Save the user's own text, not the injected injured-player / Top 25 syntax
   const excludeCb = document.querySelector('#cno-exclude-injured-cb');
+  const injuredOnlyCb = document.querySelector('#cno-injured-only-cb');
   const top25Cb = document.querySelector('#cno-top25-cb');
 
-  if (sel.texts.TextBoxBetNameContains !== undefined && excludeCb && excludeCb.checked) {
+  if (sel.texts.TextBoxBetNameContains !== undefined && injuredOnlyCb && injuredOnlyCb.checked) {
     const raw = sessionStorage.getItem(BET_CONTAINS_STORAGE_KEY);
     if (raw !== null) sel.texts.TextBoxBetNameContains = raw;
   }
@@ -2475,7 +2481,12 @@ function collectFilterSelections(container = document) {
 
   const elLive = getEl('CheckBoxIsLive');
   if (elLive) sel.checks.live = elLive.checked;
+  const elIsMainSave = getEl('CheckBoxIsMain');
+  if (elIsMainSave) sel.checks.main = elIsMainSave.checked;
+  const elHedgeMainSave = getEl('CheckBoxHedgeBook_IsMain');
+  if (elHedgeMainSave) sel.checks.hedgeMain = elHedgeMainSave.checked;
   if (excludeCb) sel.checks.excludeInjured = excludeCb.checked;
+  if (injuredOnlyCb) sel.checks.injuredOnly = injuredOnlyCb.checked;
   if (top25Cb) sel.checks.top25 = top25Cb.checked;
 
   const readRadio = (tableEl) => {
@@ -2568,13 +2579,40 @@ function applyFilterSelections(container, sel) {
   const elLive = getEl('CheckBoxIsLive');
   if (elLive && checks.live !== undefined) elLive.checked = !!checks.live;
 
+  // Mainlines first: the hedge-book box is disabled whenever Mainlines Only is off
+  const elIsMainApply = getEl('CheckBoxIsMain');
+  if (elIsMainApply && checks.main !== undefined) {
+    elIsMainApply.checked = !!checks.main;
+    elIsMainApply.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const elHedgeMainApply = getEl('CheckBoxHedgeBook_IsMain');
+  if (elHedgeMainApply && checks.hedgeMain !== undefined) {
+    if (checks.hedgeMain && elHedgeMainApply.disabled) {
+      failures.push('Mainlines Only for Hedge Book (needs Mainlines Only)');
+      elHedgeMainApply.checked = false;
+    } else {
+      elHedgeMainApply.checked = !!checks.hedgeMain;
+    }
+  }
+
   const excludeCb = document.querySelector('#cno-exclude-injured-cb');
   if (excludeCb && checks.excludeInjured !== undefined) {
     if (checks.excludeInjured && excludeCb.disabled) {
-      failures.push('Exclude Injured Players (league not eligible)');
+      failures.push('Injury Filter: Exclude (league not eligible)');
       excludeCb.checked = false;
     } else {
       excludeCb.checked = !!checks.excludeInjured;
+    }
+  }
+
+  const injuredOnlyCb = document.querySelector('#cno-injured-only-cb');
+  if (injuredOnlyCb && checks.injuredOnly !== undefined) {
+    if (checks.injuredOnly && injuredOnlyCb.disabled) {
+      failures.push('Injury Filter: Injured Only (league not eligible)');
+      injuredOnlyCb.checked = false;
+    } else {
+      injuredOnlyCb.checked = !!checks.injuredOnly;
+      if (injuredOnlyCb.checked && excludeCb) excludeCb.checked = false;
     }
   }
 
@@ -2898,7 +2936,11 @@ function openSaveFilterModal(container) {
       const existingKey = Object.keys(page).find(k => k.toLowerCase() === name.toLowerCase());
 
       const commit = (keyName) => {
+        const prev = page[keyName] || {};
         page[keyName] = { savedAt: Date.now(), selections: collectFilterSelections(container) };
+        // Overwriting a filter keeps its usage history (for the Apply Filters hover menu)
+        if (prev.useCount) page[keyName].useCount = prev.useCount;
+        if (prev.lastUsed) page[keyName].lastUsed = prev.lastUsed;
         all[pageKey] = page;
         writeSavedFilters(all, () => {
           close();
@@ -2997,6 +3039,7 @@ function openApplyFilterModal(container) {
     if (!entry) return;
     close();
     applyFilterSelections(container, entry.selections || {});
+    recordSavedFilterUse(pageKey, name);
   };
 
   const deleteByName = (name) => {
@@ -3313,8 +3356,10 @@ function ensureSavedFilterButtons(btnGroup, clearBtn) {
     applyBtn.textContent = '📂 Apply Filters';
     applyBtn.onclick = (e) => {
       e.stopPropagation();
+      hideApplyFilterHoverMenu();
       openApplyFilterModal(getFilterAccordionContainer() || document);
     };
+    attachApplyFilterHoverMenu(applyBtn);
   }
 
   let saveBtn = document.getElementById('cno-save-filters-btn');
@@ -3371,6 +3416,7 @@ function processPendingFilterApply() {
       return;
     }
     applyFilterSelections(container, entry.selections || {});
+    recordSavedFilterUse(pending.pageKey, pending.name);
   });
 }
 
@@ -3388,6 +3434,27 @@ function cnoIsMac() {
 function cnoUpdateShortcutLabel() {
   return cnoIsMac() ? 'Ctrl+\u2318+R' : 'Ctrl+Alt+R';
 }
+
+function cnoClearShortcutLabel() {
+  return cnoIsMac() ? 'Ctrl+\u2318+C' : 'Ctrl+Alt+C';
+}
+
+// Clear Filters shortcut: Ctrl+Alt+C (Windows/Linux) or Ctrl+Cmd+C (Mac). Does not run Update.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyC' || e.repeat) return;
+
+  const matches = cnoIsMac()
+    ? (e.ctrlKey && e.metaKey && !e.altKey && !e.shiftKey)
+    : (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey);
+  if (!matches) return;
+
+  const clearBtn = document.getElementById('cno-clear-filters-btn');
+  if (!clearBtn || clearBtn.offsetParent === null) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+  clearBtn.click();
+}, true);
 
 function cnoGetActiveUpdateButton() {
   const btn = document.querySelector('input[type="submit"][id$="' + CNO_UPDATE_BUTTON_ID_SUFFIX + '"]');
@@ -3418,12 +3485,12 @@ function cnoHideUpdateHint() {
   if (tip) tip.remove();
 }
 
-function cnoShowUpdateHint(btn) {
+function cnoShowUpdateHint(btn, text = null) {
   cnoHideUpdateHint();
 
   const tip = document.createElement('div');
   tip.id = 'cno-update-hint';
-  tip.textContent = `Shortcut: ${cnoUpdateShortcutLabel()}`;
+  tip.textContent = text || `Shortcut: ${cnoUpdateShortcutLabel()}`;
   tip.style.cssText = `
     position: fixed; z-index: 1000001; pointer-events: none;
     background: #0f172a; color: #ffffff; padding: 4px 8px; border-radius: 4px;
@@ -3463,11 +3530,11 @@ window.addEventListener('scroll', cnoHideUpdateHint, true);
 // "FILTER TO THIS EVENT" ICON NEXT TO EVENT NAMES IN THE TABLES
 // ====================================================
 
-const EVENT_FILTER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="display:block;"><path d="M3 4h18l-7 8.5V20l-4-2v-5.5L3 4z"/></svg>`;
+const EVENT_FILTER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="display:block;"><path d="M3 4h18l-7 8.5V20l-4-2v-5.5L3 4z"/></svg>`;
 
 function getCleanEventText(link) {
   const clone = link.cloneNode(true);
-  clone.querySelectorAll('.cno-ap-rank, .cno-weather-badge, .cno-injury-badge, .cno-badge, .cno-event-filter-btn').forEach(el => el.remove());
+  clone.querySelectorAll('.cno-ap-rank, .cno-weather-badge, .cno-injury-badge, .cno-badge, .cno-event-filter-btn, .cno-hover-tray').forEach(el => el.remove());
   return clone.textContent
     .replace(/\(#\d+\)/g, '')   // belt-and-braces: drop any AP rank text such as "(#14)"
     .replace(/"/g, '')
@@ -3491,22 +3558,39 @@ function applyEventFilter(eventText) {
   triggerFilterUpdate(getFilterAccordionContainer() || document);
 }
 
+// Hover icons live in a small tray that floats over the right edge of the cell (see content.css),
+// so they never take up room in the layout or push text onto an extra line.
+function getHoverTray(cell) {
+  let tray = cell.querySelector(':scope > .cno-hover-tray');
+  if (!tray) {
+    tray = document.createElement('span');
+    tray.className = 'cno-hover-tray';
+    cell.classList.add('cno-has-hover-tray');
+    cell.appendChild(tray);
+  }
+  return tray;
+}
+
 function processEventFilterIcons() {
   if (!document.querySelector('[id$="TextBoxEventNameContains"]')) return;
 
   document.querySelectorAll('a[href*="game.aspx"]').forEach(link => {
     if (!link.textContent.includes('@')) return;
     if (link.closest('#cno-update-banner-alert')) return;
+    if (link.closest('.cno-hover-tray')) return;
+
+    const tableCell = link.closest('#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tbody tr:not(.footable-row-detail) > td');
+    if (tableCell && tableCell.querySelector('.cno-event-filter-btn')) return;
 
     const next = link.nextElementSibling;
     if (next && next.classList && next.classList.contains('cno-event-filter-btn')) return;
 
     const btn = document.createElement('span');
-    btn.className = 'cno-event-filter-btn';
+    btn.className = 'cno-event-filter-btn cno-hover-filter-btn';
     btn.setAttribute('role', 'button');
     btn.title = 'Filter to this event';
     btn.innerHTML = EVENT_FILTER_ICON_SVG;
-    btn.style.cssText = 'display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; padding:2px; color:#0284c7; cursor:pointer; border-radius:3px;';
+    btn.style.cssText = 'display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; padding:4px; color:#0284c7; cursor:pointer; border-radius:4px;';
     btn.addEventListener('mouseover', () => { btn.style.background = '#e0f2fe'; });
     btn.addEventListener('mouseout', () => { btn.style.background = 'none'; });
     btn.addEventListener('click', (e) => {
@@ -3515,6 +3599,912 @@ function processEventFilterIcons() {
       applyEventFilter(getCleanEventText(link));
     });
 
-    link.insertAdjacentElement('afterend', btn);
+    if (tableCell) getHoverTray(tableCell).appendChild(btn);
+    else link.insertAdjacentElement('afterend', btn);
+  });
+}
+
+// ====================================================
+// HOVER FILTER ICONS FOR MARKET, BET NAME AND SPORTSBOOK CELLS
+// (list pages only; the icon shows on cell hover via content.css)
+// ====================================================
+
+// Table pages that get the hover filter icons, Calc right-click and QR buttons
+// (Arbitrage isn't in the Swap Page menu, so it's added here separately)
+const CNO_LIST_PAGE_KEYS = SWITCH_PAGES.map(p => p.key).concat(['arbitrage']);
+
+function isCnoListPage() {
+  const path = window.location.pathname.toLowerCase();
+  return CNO_LIST_PAGE_KEYS.some(key => path.includes(`${key}.aspx`));
+}
+
+// Column indexes from the header row. Hedge columns are skipped: their values belong to a different filter.
+function getListTableColumns(table) {
+  const cols = { sport: -1, league: -1, market: -1, betName: -1, sportsbook: -1, odds: -1, fairOdds: -1 };
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  ths.forEach((th, i) => {
+    const txt = th.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!txt || txt.startsWith('hedge')) return;
+    if (cols.sport === -1 && txt === 'sport') cols.sport = i;
+    else if (cols.league === -1 && txt === 'league') cols.league = i;
+    else if (cols.market === -1 && txt === 'market') cols.market = i;
+    else if (cols.betName === -1 && (txt === 'bet' || txt.endsWith(' name'))) cols.betName = i;
+    else if (cols.sportsbook === -1 && txt.includes('sportsbook')) cols.sportsbook = i;
+    else if (cols.fairOdds === -1 && txt === 'fair odds') cols.fairOdds = i;
+    else if (cols.odds === -1 && (txt === 'odds' || txt.endsWith(' odds'))) cols.odds = i;
+  });
+  return cols;
+}
+
+// Cell text without anything the extension added (badges, icons)
+function getCleanCellText(cell) {
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll('[class^="cno-"], [class*=" cno-"]').forEach(el => el.remove());
+  return clone.textContent.replace(/"/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// "Zach Edey Under 7.5" -> "Zach Edey", "Pelicans +12.5" -> "Pelicans", "Bam Adebayo Yes" -> "Bam Adebayo".
+// If nothing is left (e.g. "Over 220.5"), the full text is used.
+function extractBetNameForFilter(text) {
+  const full = (text || '').replace(/\s+/g, ' ').trim();
+  let name = full;
+  let prev;
+  do {
+    prev = name;
+    name = name
+      .replace(/\s+(over|under)\s+[+-]?\d+(\.\d+)?$/i, '')
+      .replace(/\s+[+-]\d+(\.\d+)?$/, '')
+      .replace(/\s+(yes|no)$/i, '')
+      .trim();
+  } while (name !== prev);
+  return name || full;
+}
+
+function setTextFilterAndUpdate(suffix, value) {
+  const el = document.querySelector(`[id$="${suffix}"]`);
+  if (!el || !value) return;
+  if (suffix === 'TextBoxBetNameContains') {
+    // Use the new text as the user's own value if Exclude Injured is injecting syntax
+    sessionStorage.removeItem(BET_CONTAINS_STORAGE_KEY);
+  }
+  el.value = value;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  triggerFilterUpdate(getFilterAccordionContainer() || document);
+}
+
+// Pick the dropdown option whose text matches a table value (Sport / League), then run Update
+function applyDropdownFilter(suffix, fieldLabel, value) {
+  const el = document.querySelector(`[id$="${suffix}"]`);
+  if (!el || !value) return;
+  const target = value.toLowerCase();
+  const idx = Array.from(el.options).findIndex(o => o.text.replace(/\s+/g, ' ').trim().toLowerCase() === target);
+  if (idx === -1) {
+    showSavedFilterToast(`Couldn't find "${value}" in the ${fieldLabel} list.`);
+    return;
+  }
+  el.selectedIndex = idx;
+  el.dispatchEvent(new Event('change', { bubbles: true })); // Sport/League clear each other via their change handlers
+  triggerFilterUpdate(getFilterAccordionContainer() || document);
+}
+
+function applySportsbookFilter(bookName) {
+  const el = document.querySelector('[id$="DropDownListSportsbookSite_All"]') ||
+             document.querySelector('[id$="DropDownListSportsbookSite_NonDFS"]');
+  if (!el || !bookName) return;
+  const target = bookName.toLowerCase();
+  const idx = Array.from(el.options).findIndex(o => o.text.replace(/\s+/g, ' ').trim().toLowerCase() === target);
+  if (idx === -1) {
+    showSavedFilterToast(`Couldn't find "${bookName}" in the Sportsbook list.`);
+    return;
+  }
+  el.selectedIndex = idx;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  triggerFilterUpdate(getFilterAccordionContainer() || document);
+}
+
+function createHoverFilterBtn(title, onClick) {
+  const btn = document.createElement('span');
+  btn.className = 'cno-cell-filter-btn cno-hover-filter-btn';
+  btn.setAttribute('role', 'button');
+  btn.title = title;
+  btn.innerHTML = EVENT_FILTER_ICON_SVG;
+  btn.style.cssText = 'display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; padding:4px; color:#0284c7; cursor:pointer; border-radius:4px;';
+  btn.addEventListener('mouseover', () => { btn.style.background = '#e0f2fe'; });
+  btn.addEventListener('mouseout', () => { btn.style.background = 'none'; });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return btn;
+}
+
+function processCellFilterIcons() {
+  if (!isCnoListPage()) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!table) return;
+
+  const cols = getListTableColumns(table);
+  const hasMarket = cols.market !== -1 && document.querySelector('[id$="TextBoxMarketNameContains"]');
+  const hasBet = cols.betName !== -1 && document.querySelector('[id$="TextBoxBetNameContains"]');
+  const hasBook = cols.sportsbook !== -1 && (document.querySelector('[id$="DropDownListSportsbookSite_All"]') || document.querySelector('[id$="DropDownListSportsbookSite_NonDFS"]'));
+  const hasSport = cols.sport !== -1 && document.querySelector('[id$="DropDownListSport"]');
+  const hasLeague = cols.league !== -1 && document.querySelector('[id$="DropDownListLeague"]');
+  const hedgeBookIdx = getHedgeBookColumnIndex(table);
+  if (!hasMarket && !hasBet && !hasBook && !hasSport && !hasLeague && hedgeBookIdx === -1) return;
+
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    const cells = row.children;
+
+    if (hasSport) {
+      const cell = cells[cols.sport];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        getHoverTray(cell).appendChild(createHoverFilterBtn('Filter to this sport', () => {
+          applyDropdownFilter('DropDownListSport', 'Sport', getCleanCellText(cell));
+        }));
+      }
+    }
+
+    if (hasLeague) {
+      const cell = cells[cols.league];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        getHoverTray(cell).appendChild(createHoverFilterBtn('Filter to this league', () => {
+          applyDropdownFilter('DropDownListLeague', 'League', getCleanCellText(cell));
+        }));
+      }
+    }
+
+    if (hasMarket) {
+      const cell = cells[cols.market];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        getHoverTray(cell).appendChild(createHoverFilterBtn('Filter to this market', () => {
+          setTextFilterAndUpdate('TextBoxMarketNameContains', `"${getCleanCellText(cell)}"`);
+        }));
+      }
+    }
+
+    if (hasBet) {
+      const cell = cells[cols.betName];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        getHoverTray(cell).appendChild(createHoverFilterBtn('Filter to this name', () => {
+          setTextFilterAndUpdate('TextBoxBetNameContains', `"${extractBetNameForFilter(getCleanCellText(cell))}"`);
+        }));
+      }
+    }
+
+    if (hedgeBookIdx !== -1) {
+      const cell = cells[hedgeBookIdx];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        const filterBtn = createHoverFilterBtn('Show only rows with this hedge sportsbook', () => {
+          setHedgeBookFilter(getCleanCellText(cell));
+        });
+        const qrBtn = cell.querySelector('.cno-qr-btn');
+        if (qrBtn) qrBtn.parentNode.insertBefore(filterBtn, qrBtn);
+        else getHoverTray(cell).appendChild(filterBtn);
+      }
+    }
+
+    if (hasBook) {
+      const cell = cells[cols.sportsbook];
+      if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
+        const filterBtn = createHoverFilterBtn('Filter to this sportsbook', () => {
+          applySportsbookFilter(getCleanCellText(cell));
+        });
+        const qrBtn = cell.querySelector('.cno-qr-btn');
+        if (qrBtn) qrBtn.parentNode.insertBefore(filterBtn, qrBtn);
+        else getHoverTray(cell).appendChild(filterBtn);
+      }
+    }
+  });
+}
+
+// ====================================================
+// CALC BUTTON: MODERN STYLE (content.css) + RIGHT-CLICK "OPEN IN DEVIGGER"
+// ====================================================
+
+const CALC_DEVIG_TOOLTIP = 'Click to open the calculator. Right-click to open in Devigger.';
+
+function getCalcRowDeviggerUrl(btn) {
+  const row = btn.closest('tr');
+  const table = btn.closest('table');
+  if (!row || !table) return null;
+
+  const cols = getListTableColumns(table);
+  if (cols.odds === -1 || cols.fairOdds === -1) return null;
+
+  const oddsCell = row.children[cols.odds];
+  const fairCell = row.children[cols.fairOdds];
+  if (!oddsCell || !fairCell) return null;
+
+  const finalOdds = extractAmericanOdds(getCleanCellText(oddsCell));
+  const fairOdds = extractAmericanOdds(getCleanCellText(fairCell));
+  if (!finalOdds || !fairOdds) return null;
+
+  // Same URL format as the calc popup's "Open in Devigger" link
+  let url = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(fairOdds.replace('+', ''))}&FinalOdds=${encodeURIComponent(finalOdds.replace('+', ''))}`;
+
+  // Odds Boost page: carry the profit boost, as the popup does
+  if (window.location.pathname.toLowerCase().includes('odds-boost.aspx')) {
+    const boostType = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
+    const pctInput = document.querySelector('#spanBoostPercentage input[type="text"]');
+    const pct = pctInput ? pctInput.value.replace('%', '').trim() : '';
+    if ((!boostType || boostType.value === 'profit') && pct && !isNaN(parseFloat(pct))) {
+      url += `&Boost_Bool=1&Boost_Text=${encodeURIComponent(pct)}&Boost_Type=0`;
+    }
+  }
+  return url;
+}
+
+function showCalcDeviggerMenu(x, y, url) {
+  const existing = document.getElementById('cno-context-menu');
+  if (existing) existing.remove();
+
+  const menu = document.createElement('div');
+  menu.id = 'cno-context-menu';
+  menu.style.cssText = `
+    position: fixed; top: ${y}px; left: ${x}px;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); z-index: 999999;
+    padding: 4px 0; min-width: 150px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+  const item = document.createElement('a');
+  item.href = url;
+  item.target = '_blank';
+  item.rel = 'noopener';
+  item.textContent = 'Open in Devigger ↗';
+  item.style.cssText = 'display:block; padding:6px 12px; color:#0369a1; font-weight:600; font-size:0.8rem; text-decoration:none;';
+  item.addEventListener('mouseover', () => { item.style.background = '#f0f9ff'; });
+  item.addEventListener('mouseout', () => { item.style.background = 'none'; });
+  item.addEventListener('click', () => menu.remove());
+  menu.appendChild(item);
+
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = `${Math.max(4, window.innerWidth - rect.width - 4)}px`;
+  if (rect.bottom > window.innerHeight) menu.style.top = `${Math.max(4, window.innerHeight - rect.height - 4)}px`;
+}
+
+function getCalcButtonFromEvent(e) {
+  const el = e.target && e.target.closest ? e.target.closest('input[type="button"]') : null;
+  if (!el || el.value !== 'Calc') return null;
+  if (!el.closest('#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1')) return null;
+  return el;
+}
+
+function processCalcButtons() {
+  if (!isCnoListPage()) return;
+  document.querySelectorAll('#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 input[type="button"][value="Calc"]').forEach(btn => {
+    if (btn.dataset.cnoCalcReady) return;
+    btn.dataset.cnoCalcReady = 'true';
+    btn.classList.add('cno-calc-btn');
+    if (getCalcRowDeviggerUrl(btn)) btn.title = CALC_DEVIG_TOOLTIP;
+  });
+}
+
+document.addEventListener('contextmenu', (e) => {
+  if (!isCnoListPage()) return;
+  const btn = getCalcButtonFromEvent(e);
+  if (!btn) return;
+  const url = getCalcRowDeviggerUrl(btn);
+  if (!url) return;
+  e.preventDefault();
+  showCalcDeviggerMenu(e.clientX, e.clientY, url);
+});
+
+document.addEventListener('click', () => {
+  const menu = document.getElementById('cno-context-menu');
+  if (menu) menu.remove();
+});
+window.addEventListener('scroll', () => {
+  const menu = document.getElementById('cno-context-menu');
+  if (menu) menu.remove();
+}, true);
+
+// ====================================================
+// ODDS BOOST PAGE: START THE CURSOR IN THE BOOST AMOUNT BOX
+// ====================================================
+
+let cnoBoostFocusDone = false;
+const cnoBoostFocusDeadline = Date.now() + 15000;
+
+function processBoostAutoFocus() {
+  if (cnoBoostFocusDone) return;
+  if (!window.location.pathname.toLowerCase().includes('odds-boost.aspx')) { cnoBoostFocusDone = true; return; }
+  if (Date.now() > cnoBoostFocusDeadline) { cnoBoostFocusDone = true; return; }
+
+  // Wait until the filter panel is built (and any Swap Page / saved-filter values are filled in)
+  const container = getFilterAccordionContainer();
+  if (container && !container.classList.contains('cno-ready')) return;
+  try { if (sessionStorage.getItem(PENDING_FILTER_APPLY_KEY)) return; } catch (e) { /* ignore */ }
+
+  // Don't take the cursor away from a box the user already clicked into
+  const active = document.activeElement;
+  if (active && active !== document.body && active !== document.documentElement) { cnoBoostFocusDone = true; return; }
+
+  // Profit / Full Wager boost use the % box; Odds Surge uses the boosted-odds box
+  const candidates = [
+    document.querySelector('#spanBoostPercentage input[type="text"]'),
+    document.querySelector('#spanBoostOdds input[type="text"]')
+  ];
+  const input = candidates.find(el => el && !el.disabled && el.offsetParent !== null);
+  if (!input) return;
+
+  input.focus();
+  try { input.select(); } catch (e) { /* ignore */ }
+  cnoBoostFocusDone = true;
+}
+
+// ====================================================
+// QR CODE BUTTON ON SPORTSBOOK CELLS
+// Encodes CNO's own redirect link (not the book's direct link), shown in a popup that
+// closes on any click or key press. QR encoder: qrcode.js (window.CnoQRCode).
+// ====================================================
+
+function closeQrPopup() {
+  const overlay = document.getElementById('cno-qr-overlay');
+  if (overlay) overlay.remove();
+  document.removeEventListener('mousedown', onQrPopupDismiss, true);
+  document.removeEventListener('keydown', onQrPopupDismiss, true);
+  window.removeEventListener('scroll', closeQrPopup, true);
+}
+
+function onQrPopupDismiss(e) {
+  // Swallow the click/key so it doesn't also act on the page underneath
+  e.preventDefault();
+  e.stopPropagation();
+  closeQrPopup();
+  if (e.type === 'mousedown') {
+    const swallowClick = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+    document.addEventListener('click', swallowClick, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener('click', swallowClick, true), 400);
+  }
+}
+
+function buildQrSvg(text, pixelSize = 300) {
+  if (!window.CnoQRCode) return null;
+  let qr;
+  try { qr = window.CnoQRCode.create(text); } catch (e) { return null; }
+  const quiet = 4;
+  const dim = qr.size + quiet * 2;
+  let path = '';
+  for (let r = 0; r < qr.size; r++) {
+    for (let c = 0; c < qr.size; c++) {
+      if (qr.isDark(r, c)) path += `M${c + quiet} ${r + quiet}h1v1h-1z`;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dim} ${dim}" width="${pixelSize}" height="${pixelSize}" shape-rendering="crispEdges" style="display:block;"><rect width="${dim}" height="${dim}" fill="#ffffff"/><path d="${path}" fill="#000000"/></svg>`;
+}
+
+function openQrPopup(url, bookName, details = {}) {
+  closeQrPopup();
+  const svg = buildQrSvg(url);
+  if (!svg) {
+    showSavedFilterToast("Couldn't create a QR code for this link.");
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cno-qr-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 1000002;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: #ffffff; border-radius: 10px; padding: 16px 18px 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center;
+  `;
+
+  const title = document.createElement('div');
+  title.style.cssText = 'margin-bottom: 10px; max-width: 300px; margin-left: auto; margin-right: auto;';
+
+  const titleBook = document.createElement('div');
+  titleBook.textContent = bookName || 'Sportsbook';
+  titleBook.style.cssText = 'font-weight: 700; font-size: 1rem; color: #0f172a;';
+  title.appendChild(titleBook);
+
+  const betLine = [details.market, details.betName].filter(Boolean).join(' ');
+  if (betLine) {
+    const titleBet = document.createElement('div');
+    titleBet.textContent = betLine;
+    titleBet.style.cssText = 'font-weight: 600; font-size: 0.85rem; color: #334155; margin-top: 3px; line-height: 1.3;';
+    title.appendChild(titleBet);
+  }
+  if (details.odds) {
+    const titleOdds = document.createElement('div');
+    titleOdds.textContent = details.odds;
+    titleOdds.style.cssText = 'font-weight: 700; font-size: 0.95rem; color: #0284c7; margin-top: 3px;';
+    title.appendChild(titleOdds);
+  }
+
+  const qrWrap = document.createElement('div');
+  qrWrap.innerHTML = svg;
+
+  const hint = document.createElement('div');
+  hint.textContent = 'Scan with your phone. Click or press any key to close.';
+  hint.style.cssText = 'font-size: 0.75rem; color: #64748b; margin-top: 8px;';
+
+  box.appendChild(title);
+  box.appendChild(qrWrap);
+  box.appendChild(hint);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Wait a tick so the click that opened the popup doesn't close it
+  setTimeout(() => {
+    if (!document.getElementById('cno-qr-overlay')) return;
+    document.addEventListener('mousedown', onQrPopupDismiss, true);
+    document.addEventListener('keydown', onQrPopupDismiss, true);
+    window.addEventListener('scroll', closeQrPopup, true);
+  }, 0);
+}
+
+function createQrBtn(link, getBookName, getDetails = () => ({})) {
+  const btn = document.createElement('span');
+  btn.className = 'cno-qr-btn cno-hover-filter-btn';
+  btn.setAttribute('role', 'button');
+  btn.title = 'Show QR code for this link';
+  btn.textContent = 'QR';
+  btn.style.cssText = `
+    display:inline-flex; align-items:center; vertical-align:middle; margin-left:6px;
+    padding:3px 7px; font-size:0.78rem; font-weight:700; line-height:1.2; letter-spacing:0.02em;
+    color:#0284c7; border:1px solid #7dd3fc; border-radius:4px; cursor:pointer; user-select:none;
+  `;
+  btn.addEventListener('mouseover', () => { btn.style.background = '#e0f2fe'; });
+  btn.addEventListener('mouseout', () => { btn.style.background = 'none'; });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openQrPopup(link.href, getBookName(), getDetails());
+  });
+  return btn;
+}
+
+function processSportsbookQrButtons() {
+  if (!isCnoListPage()) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!table) return;
+
+  // Every Sportsbook column, including "Hedge Bet Sportsbook" (only present when the page shows hedge bets)
+  const bookCols = [];
+  Array.from(table.querySelectorAll('thead th')).forEach((th, i) => {
+    if (th.textContent.replace(/\s+/g, ' ').trim().toLowerCase().includes('sportsbook')) bookCols.push(i);
+  });
+  if (!bookCols.length) return;
+
+  // For each book column, the matching Name / Odds columns (hedge book -> hedge name/odds)
+  const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const marketIdx = headers.findIndex(h => h === 'market');
+  const findCol = (isHedge, test) => headers.findIndex(h => h.startsWith('hedge') === isHedge && test(h));
+  const relatedCols = {};
+  bookCols.forEach(idx => {
+    const isHedge = headers[idx].startsWith('hedge');
+    relatedCols[idx] = {
+      name: findCol(isHedge, h => h === 'bet' || h.endsWith(' name')),
+      odds: findCol(isHedge, h => h !== 'fair odds' && (h === 'odds' || h.endsWith(' odds')))
+    };
+  });
+
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    bookCols.forEach(idx => {
+      const cell = row.children[idx];
+      if (!cell || cell.querySelector('.cno-qr-btn')) return;
+      const link = cell.querySelector('a[href*="deeplink.aspx"]') || cell.querySelector('a[href]');
+      if (!link || !link.href || !/^https?:/i.test(link.href)) return;
+
+      const getDetails = () => {
+        const textAt = (i) => (i >= 0 && row.children[i]) ? getCleanCellText(row.children[i]) : '';
+        const oddsText = textAt(relatedCols[idx].odds);
+        return {
+          market: textAt(marketIdx),
+          betName: textAt(relatedCols[idx].name),
+          odds: (typeof extractAmericanOdds === 'function' && extractAmericanOdds(oddsText)) || oddsText
+        };
+      };
+      getHoverTray(cell).appendChild(createQrBtn(link, () => getCleanCellText(cell), getDetails));
+    });
+  });
+}
+
+// ====================================================
+// HEDGE BET SPORTSBOOK FILTER (client-side only)
+// There's no hedge-book dropdown on the site, so this hides non-matching rows in the table
+// instead of running Update. It survives Update (re-applied every pass) and is cleared by
+// the ✕ or by any page load, since it only lives in memory.
+// ====================================================
+
+let cnoHedgeBookFilter = null;
+
+window.addEventListener('pageshow', (e) => {
+  // Coming back via the browser's back/forward cache counts as a fresh page load
+  if (e.persisted) clearHedgeBookFilter();
+});
+
+function getHedgeBookColumnIndex(table) {
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  return ths.findIndex(th => {
+    const txt = th.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
+    return txt.startsWith('hedge') && txt.includes('sportsbook');
+  });
+}
+
+function setHedgeBookFilter(bookName) {
+  if (!bookName) return;
+  cnoHedgeBookFilter = bookName;
+  processHedgeBookFilter();
+}
+
+function clearHedgeBookFilter() {
+  cnoHedgeBookFilter = null;
+  processHedgeBookFilter();
+}
+
+function processHedgeBookFilter() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  let banner = document.getElementById('cno-hedge-filter-banner');
+
+  if (!cnoHedgeBookFilter) {
+    if (banner) banner.remove();
+    document.querySelectorAll('.cno-hedge-hidden').forEach(el => el.classList.remove('cno-hedge-hidden'));
+    return;
+  }
+  if (!table || !isCnoListPage()) return;
+
+  const target = cnoHedgeBookFilter.toLowerCase();
+  const hedgeIdx = getHedgeBookColumnIndex(table);
+
+  if (hedgeIdx !== -1) {
+    table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+      const cell = row.children[hedgeIdx];
+      const match = !!cell && getCleanCellText(cell).toLowerCase() === target;
+      row.classList.toggle('cno-hedge-hidden', !match);
+      // Keep an expanded (mobile/narrow view) detail row in step with its main row
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-hedge-hidden', !match);
+    });
+  }
+
+  if (!banner) {
+    // The notice is an extra first row inside the table header, so it stays pinned with the header
+    // while scrolling. It uses a <td>, not a <th>, so column lookups ("thead th") are unaffected,
+    // and footable reads column settings from the last header row, which is still the real one.
+    banner = document.createElement('tr');
+    banner.id = 'cno-hedge-filter-banner';
+    const bannerCell = document.createElement('td');
+    bannerCell.className = 'cno-hedge-filter-cell';
+    bannerCell.style.cssText = 'text-align: left; padding: 4px 0 5px 0; background: #ffffff; border: none;';
+    banner.appendChild(bannerCell);
+    const pill = document.createElement('span');
+    pill.className = 'cno-hedge-filter-pill';
+    pill.style.cssText = `
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 6px 4px 10px;
+      background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 6px;
+      color: #0369a1; font-size: 0.8rem; font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+    bannerCell.appendChild(pill);
+    const label = document.createElement('span');
+    label.className = 'cno-hedge-filter-label';
+    const closeBtn = document.createElement('span');
+    closeBtn.setAttribute('role', 'button');
+    closeBtn.title = 'Remove hedge sportsbook filter';
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'cursor:pointer; padding:0 5px; border-radius:3px; font-weight:700; line-height:1.3;';
+    closeBtn.addEventListener('mouseover', () => { closeBtn.style.background = '#bae6fd'; });
+    closeBtn.addEventListener('mouseout', () => { closeBtn.style.background = 'none'; });
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearHedgeBookFilter();
+    });
+    pill.appendChild(label);
+    pill.appendChild(closeBtn);
+  }
+
+  const labelText = `Filtered to ${cnoHedgeBookFilter} Hedge Sportsbook`;
+  const label = banner.querySelector('.cno-hedge-filter-label');
+  if (label.textContent !== labelText) label.textContent = labelText;
+
+  const thead = table.querySelector('thead');
+  if (!thead) return;
+  const headerCount = Math.max(1, table.querySelectorAll('thead th').length);
+  const bannerCell = banner.querySelector('.cno-hedge-filter-cell');
+  if (bannerCell && String(bannerCell.colSpan) !== String(headerCount)) bannerCell.colSpan = headerCount;
+  if (banner.parentNode !== thead || thead.firstElementChild !== banner) {
+    thead.insertBefore(banner, thead.firstChild);
+  }
+}
+
+// ====================================================
+// SAVED FILTER USAGE + "APPLY FILTERS" HOVER MENU
+// Each saved filter keeps useCount / lastUsed. Hovering Apply Filters lists the page's 10 most-used
+// filters (ties: most recent), shown alphabetically, topped up with unused ones. Click still opens the popup.
+// ====================================================
+
+const APPLY_HOVER_MENU_MAX = 10;
+
+function recordSavedFilterUse(pageKey, name) {
+  readSavedFilters((all) => {
+    const entry = (all[pageKey] || {})[name];
+    if (!entry) return;
+    entry.useCount = (entry.useCount || 0) + 1;
+    entry.lastUsed = Date.now();
+    writeSavedFilters(all, () => {});
+  });
+}
+
+function pickApplyHoverMenuNames(page) {
+  const names = Object.keys(page);
+  const ranked = names.slice().sort((a, b) => {
+    const ea = page[a] || {}, eb = page[b] || {};
+    const ca = ea.useCount || 0, cb = eb.useCount || 0;
+    if (cb !== ca) return cb - ca;
+    const la = ea.lastUsed || 0, lb = eb.lastUsed || 0;
+    if (lb !== la) return lb - la;
+    return a.localeCompare(b, undefined, { sensitivity: 'base' }); // unused filters fill in alphabetically
+  });
+  return ranked.slice(0, APPLY_HOVER_MENU_MAX)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+let cnoApplyHoverMenuHide = null;
+function hideApplyFilterHoverMenu() {
+  if (cnoApplyHoverMenuHide) cnoApplyHoverMenuHide();
+}
+
+function attachApplyFilterHoverMenu(btn) {
+  let menu = null;
+  let hideTimer = null;
+  let showTimer = null;
+  let hovering = false;
+
+  const cancelHide = () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } };
+  const cancelShow = () => { if (showTimer) { clearTimeout(showTimer); showTimer = null; } };
+  const hide = () => { cancelHide(); cancelShow(); if (menu) { menu.remove(); menu = null; } };
+  const scheduleHide = () => { cancelHide(); hideTimer = setTimeout(hide, 180); };
+  cnoApplyHoverMenuHide = hide;
+
+  const build = () => {
+    const pageKey = getSavedFiltersPageKey();
+    readSavedFilters((all) => {
+      if (!hovering || menu) return;
+      const page = all[pageKey] || {};
+      const total = Object.keys(page).length;
+
+      menu = document.createElement('div');
+      menu.id = 'cno-apply-filter-hover-menu';
+      menu.style.cssText = `
+        position: fixed; z-index: 1000001; width: 260px;
+        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+        box-shadow: 0 12px 28px rgba(15,23,42,0.16), 0 2px 6px rgba(15,23,42,0.08);
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        opacity: 0; transform: translateY(-4px);
+        transition: opacity 0.12s ease, transform 0.12s ease;
+      `;
+
+      // Header
+      const header = document.createElement('div');
+      header.style.cssText = `
+        display:flex; align-items:center; justify-content:space-between;
+        padding: 8px 12px 7px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+        font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b;
+      `;
+      const headerLabel = document.createElement('span');
+      headerLabel.textContent = 'Quick Apply';
+      const headerCount = document.createElement('span');
+      headerCount.textContent = `${total} saved`;
+      headerCount.style.cssText = 'font-weight:600; letter-spacing:0; text-transform:none; color:#94a3b8;';
+      header.appendChild(headerLabel);
+      header.appendChild(headerCount);
+      menu.appendChild(header);
+
+      // Filter list
+      const list = document.createElement('div');
+      list.style.cssText = 'padding: 5px;';
+      const names = pickApplyHoverMenuNames(page);
+
+      if (!names.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'No saved filters on this page yet.';
+        empty.style.cssText = 'padding: 10px 8px; font-size: 0.8rem; color: #94a3b8; font-style: italic;';
+        list.appendChild(empty);
+      }
+
+      names.forEach(name => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.title = `Apply "${name}"`;
+        item.style.cssText = `
+          display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+          background:none; border:none; padding:7px 9px; border-radius:6px; cursor:pointer;
+          font-size:0.84rem; font-weight:600; color:#0f172a;
+          transition: background-color 0.1s ease, color 0.1s ease;
+        `;
+
+        const icon = document.createElement('span');
+        icon.innerHTML = EVENT_FILTER_ICON_SVG;
+        icon.style.cssText = `
+          flex: 0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+          width:22px; height:22px; border-radius:5px; background:#e0f2fe; color:#0284c7;
+        `;
+
+        const label = document.createElement('span');
+        label.textContent = name;
+        label.style.cssText = 'flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
+
+        const arrow = document.createElement('span');
+        arrow.textContent = '›';
+        arrow.style.cssText = 'flex:0 0 auto; font-size:1rem; line-height:1; color:#0284c7; opacity:0; transition:opacity 0.1s ease;';
+
+        item.appendChild(icon);
+        item.appendChild(label);
+        item.appendChild(arrow);
+
+        item.addEventListener('mouseover', () => {
+          item.style.background = '#f0f9ff';
+          item.style.color = '#0369a1';
+          icon.style.background = '#0284c7';
+          icon.style.color = '#ffffff';
+          arrow.style.opacity = '1';
+        });
+        item.addEventListener('mouseout', () => {
+          item.style.background = 'none';
+          item.style.color = '#0f172a';
+          icon.style.background = '#e0f2fe';
+          icon.style.color = '#0284c7';
+          arrow.style.opacity = '0';
+        });
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          hide();
+          readSavedFilters((latest) => {
+            const entry = (latest[pageKey] || {})[name];
+            if (!entry) {
+              showSavedFilterToast(`Couldn't find the filter "${name}" on this page.`);
+              return;
+            }
+            applyFilterSelections(getFilterAccordionContainer() || document, entry.selections || {});
+            recordSavedFilterUse(pageKey, name);
+          });
+        });
+        list.appendChild(item);
+      });
+      menu.appendChild(list);
+
+      // Footer: always offer the full popup
+      const footer = document.createElement('button');
+      footer.type = 'button';
+      footer.innerHTML = `<span style="font-size:0.95rem; line-height:1;">⚙️</span><span>Show / Manage All Filters</span>`;
+      footer.style.cssText = `
+        display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
+        background:#f8fafc; border:none; border-top:1px solid #e2e8f0;
+        padding: 9px 12px; cursor:pointer;
+        font-size:0.8rem; font-weight:700; color:#0369a1;
+        transition: background-color 0.1s ease;
+      `;
+      footer.addEventListener('mouseover', () => footer.style.background = '#e0f2fe');
+      footer.addEventListener('mouseout', () => footer.style.background = '#f8fafc');
+      footer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hide();
+        openApplyFilterModal(getFilterAccordionContainer() || document);
+      });
+      menu.appendChild(footer);
+
+      menu.addEventListener('mouseenter', () => { hovering = true; cancelHide(); });
+      menu.addEventListener('mouseleave', () => { hovering = false; scheduleHide(); });
+      document.body.appendChild(menu);
+
+      const rect = btn.getBoundingClientRect();
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${rect.bottom + 4}px`;
+      requestAnimationFrame(() => {
+        if (!menu) return;
+        menu.style.opacity = '1';
+        menu.style.transform = 'translateY(0)';
+      });
+    });
+  };
+
+  btn.addEventListener('mouseenter', () => {
+    hovering = true;
+    cancelHide();
+    if (menu || showTimer) return;
+    showTimer = setTimeout(() => { showTimer = null; build(); }, 150);
+  });
+  btn.addEventListener('mouseleave', () => {
+    hovering = false;
+    cancelShow();
+    scheduleHide();
+  });
+  window.addEventListener('scroll', hide, true);
+}
+
+// ====================================================
+// INJURY FILTER: "EXCLUDE" HIDES ROWS FOR INJURED PLAYERS
+// A row is hidden when its League is MLB/NBA/NFL/WNBA and its bet name (minus periods, commas,
+// Over/Under/Yes/No and numbers) matches a player on that league's injury report.
+// Re-applied every pass, so it survives Update; unchecking shows the rows again immediately.
+// ====================================================
+
+function processInjuredRowExclusion() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const cb = document.getElementById('cno-exclude-injured-cb');
+  const active = !!(table && cb && cb.checked && !cb.disabled && isCnoListPage() &&
+    typeof injuryDataMap !== 'undefined' && injuryDataMap && injuryDataMap.size > 0);
+
+  let hidden = 0;
+  if (!active) {
+    document.querySelectorAll('.cno-injured-hidden').forEach(el => el.classList.remove('cno-injured-hidden'));
+  } else {
+    const ths = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+    const leagueIdx = ths.findIndex(h => h === 'league');
+    const nameIdx = getListTableColumns(table).betName;
+
+    table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+      let injured = false;
+      if (leagueIdx !== -1 && nameIdx !== -1) {
+        const league = (row.children[leagueIdx] ? getCleanCellText(row.children[leagueIdx]) : '').toUpperCase();
+        if (VALID_INJURY_LEAGUES.includes(league) && row.children[nameIdx]) {
+          const name = normalizePlayerName(getCleanCellText(row.children[nameIdx]));
+          injured = !!name && injuryDataMap.has(`${league}|${name}`);
+        }
+      }
+      row.classList.toggle('cno-injured-hidden', injured);
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-injured-hidden', injured);
+      if (injured) hidden++;
+    });
+  }
+
+  // Small note on the injury-status line above the table (uses space that's already reserved)
+  const banner = document.getElementById('cno-injury-refresh-banner');
+  let note = document.getElementById('cno-injured-hidden-note');
+  if (!active || !banner) {
+    if (note) note.remove();
+    return;
+  }
+  if (!note || note.parentNode !== banner) {
+    if (note) note.remove();
+    note = document.createElement('span');
+    note.id = 'cno-injured-hidden-note';
+    note.style.cssText = 'margin-right: auto; font-size: 0.7rem; font-weight: 500; color: #94a3b8;';
+    banner.insertBefore(note, banner.firstChild);
+  }
+  const text = `${hidden} row${hidden === 1 ? '' : 's'} hidden (injured players)`;
+  if (note.textContent !== text) note.textContent = text;
+}
+
+// ====================================================
+// OPTION: REMOVE THE "EXTRA" COLUMN WHEN NO ROW USES IT
+// ====================================================
+
+function processUnusedExtraColumn() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!table) return;
+
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  const idx = ths.findIndex(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === 'extra');
+  if (idx === -1) return;
+
+  const rows = Array.from(table.querySelectorAll('tbody tr:not(.footable-row-detail)'));
+  const cellIsEmpty = (cell) => !cell ||
+    (getCleanCellText(cell) === '' && !cell.querySelector('img, input, svg, a'));
+
+  const hide = !!(typeof userSettings !== 'undefined' && userSettings.hideUnusedExtraColumn) &&
+    rows.every(row => cellIsEmpty(row.children[idx]));
+
+  ths[idx].classList.toggle('cno-col-hidden', hide);
+  rows.forEach(row => {
+    const cell = row.children[idx];
+    if (cell) cell.classList.toggle('cno-col-hidden', hide);
   });
 }

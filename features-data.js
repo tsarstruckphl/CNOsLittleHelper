@@ -711,7 +711,7 @@ function processPlayerTableRefreshTimestamp() {
   const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
   const existingBanner = document.getElementById('cno-injury-refresh-banner');
 
-  if (!table || !userSettings.enableInjuryBadges) {
+  if (!table) {
     if (existingBanner) existingBanner.remove();
     return;
   }
@@ -726,6 +726,7 @@ function processPlayerTableRefreshTimestamp() {
     }
   });
 
+  // Pages without a Market column (e.g. game pages) never show the notice
   if (marketColIdx === -1) {
     if (existingBanner) existingBanner.remove();
     return;
@@ -740,13 +741,8 @@ function processPlayerTableRefreshTimestamp() {
     }
   });
 
-  if (!hasPlayerRow) {
-    if (existingBanner) existingBanner.remove();
-    return;
-  }
-
   const tsToDisplay = latestInjuryTimestamp || localStorage.getItem('cno_injury_last_timestamp') || '';
-  if (!tsToDisplay) return;
+  const showNotice = userSettings.enableInjuryBadges && hasPlayerRow && !!tsToDisplay;
 
   let banner = existingBanner;
   if (!banner) {
@@ -762,10 +758,20 @@ function processPlayerTableRefreshTimestamp() {
       margin-bottom: 4px;
       width: 100%;
     `;
+  }
+  if (banner.nextElementSibling !== table) {
     table.parentNode.insertBefore(banner, table);
   }
 
-  banner.innerHTML = `<span>Injury Statuses Last Refreshed at <strong>${tsToDisplay}</strong></span>`;
+  // The space is always kept so the gap between the filters and the table doesn't change;
+  // when there's nothing to show, the same line is rendered invisibly.
+  const html = showNotice
+    ? `<span>Injury Statuses Last Refreshed at <strong>${tsToDisplay}</strong></span>`
+    : `<span style="visibility:hidden;" aria-hidden="true">Injury Statuses Last Refreshed at <strong>00:00</strong></span>`;
+  if (banner.dataset.cnoHtml !== html) {
+    banner.innerHTML = html;
+    banner.dataset.cnoHtml = html;
+  }
 }
 
 // ====================================================

@@ -41,6 +41,13 @@ processUpdateBannerAlert(); // Added update banner check
   processModernSpacing();
   processPendingFilterApply();
   processEventFilterIcons();
+  processCellFilterIcons();
+  processSportsbookQrButtons();
+  processHedgeBookFilter();
+  processInjuredRowExclusion();
+  processUnusedExtraColumn();
+  processCalcButtons();
+  processBoostAutoFocus();
 }
 
 setInterval(runAll, 500);

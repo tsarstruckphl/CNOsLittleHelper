@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enableMlbWeather: true,
     enableApRankings: true,
     hideShareLinkPane: false,
-    hideReadmePane: false
+    hideReadmePane: false,
+    hideUnusedExtraColumn: false
   }, (items) => {
     document.getElementById('enableFilterModernization').checked = items.enableFilterModernization;
     document.getElementById('enablePctBadges').checked = items.enablePctBadges;
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('enableApRankings').checked = items.enableApRankings;
     document.getElementById('hideShareLinkPane').checked = items.hideShareLinkPane;
     document.getElementById('hideReadmePane').checked = items.hideReadmePane;
+    document.getElementById('hideUnusedExtraColumn').checked = items.hideUnusedExtraColumn;
   });
 
   // Bind change listeners to auto-save settings
@@ -48,7 +50,8 @@ function saveOptions() {
     enableMlbWeather: document.getElementById('enableMlbWeather').checked,
     enableApRankings: document.getElementById('enableApRankings').checked,
     hideShareLinkPane: document.getElementById('hideShareLinkPane').checked,
-    hideReadmePane: document.getElementById('hideReadmePane').checked
+    hideReadmePane: document.getElementById('hideReadmePane').checked,
+    hideUnusedExtraColumn: document.getElementById('hideUnusedExtraColumn').checked
   };
 
   chrome.storage.local.set(settings, () => {

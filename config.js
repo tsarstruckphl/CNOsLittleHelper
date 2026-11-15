@@ -29,7 +29,8 @@ let userSettings = {
   enableFilterModernization: true,
   enablePctBadges: true,
   hideShareLinkPane: false,
-  hideReadmePane: false
+  hideReadmePane: false,
+  hideUnusedExtraColumn: false
 };
 let userSettingsLoaded = false;
 
@@ -42,7 +43,8 @@ function refreshUserSettings(callback) {
       enableFilterModernization: true,
       enablePctBadges: true,
       hideShareLinkPane: false,
-      hideReadmePane: false
+      hideReadmePane: false,
+      hideUnusedExtraColumn: false
     }, (items) => {
       userSettings = items;
       userSettingsLoaded = true;
@@ -68,7 +70,7 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged)
 
     for (let [key, { newValue }] of Object.entries(changes)) {
       if (key in userSettings) {
-        userSettings[key] = newValue !== undefined ? newValue : !(key === 'hideShareLinkPane' || key === 'hideReadmePane');
+        userSettings[key] = newValue !== undefined ? newValue : !(key === 'hideShareLinkPane' || key === 'hideReadmePane' || key === 'hideUnusedExtraColumn');
         if (key === 'enableFilterModernization') {
           needsFilterReset = true;
         }

@@ -92,16 +92,20 @@ function getOwnText(el) {
 }
 
 function updateDeviggerLink(popup) {
-  let fairOdds = '';
-  const fairEl = document.getElementById('PopupCalc_EVTab_FairOdds') || 
-                 document.getElementById('PopupCalc_FairOdds');
+  const activeTab = popup.querySelector('.ajax__tab_panel[style*="visible"], .ajax__tab_panel[style*="block"]') || popup;
 
+  // Two-bet (hedge) calculators, as on Low Hold, Arbitrage or a Hedge profit strategy, have no fair
+  // value, so there's nothing to devig: only show the button when the visible calculator has Fair Odds.
+  let fairOdds = '';
+  const fairEl = activeTab.querySelector('#PopupCalc_EVTab_FairOdds, #PopupCalc_FairOdds');
   if (fairEl) {
-    fairOdds = getOwnText(fairEl).replace('+', '');
-  } else {
-    const hedgeInput = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_TabContainerPopupCalc_TabPanelPopupCalc_Hedge_TextBoxPopupCalc_HedgeTab_Hedge_BetOdds') ||
-                       document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_TextBoxPopupCalc_Hedge_BetOdds');
-    if (hedgeInput) fairOdds = hedgeInput.value.trim().replace('+', '');
+    fairOdds = getOwnText(fairEl).replace('+', '').trim();
+    if (!/^-?\d+$/.test(fairOdds)) fairOdds = '';
+  }
+
+  if (!fairOdds) {
+    popup.querySelectorAll('.cno-devigger-link').forEach(el => el.remove());
+    return;
   }
 
   let finalOdds = '';
@@ -138,7 +142,6 @@ function updateDeviggerLink(popup) {
     deviggerUrl += `&Boost_Bool=1&Boost_Text=${encodeURIComponent(boostVal)}&Boost_Type=0`;
   }
 
-  const activeTab = popup.querySelector('.ajax__tab_panel[style*="visible"], .ajax__tab_panel[style*="block"]') || popup;
   const table = activeTab.querySelector('table');
   if (!table) return;
 
@@ -146,11 +149,26 @@ function updateDeviggerLink(popup) {
   if (!linkContainer) {
     linkContainer = document.createElement('div');
     linkContainer.className = 'cno-devigger-link';
-    linkContainer.style.cssText = 'margin: 10px 0; text-align: center;';
+    linkContainer.style.cssText = 'margin: 4px 0 8px 0; text-align: center;';
     table.parentNode.insertBefore(linkContainer, table);
   }
 
-  linkContainer.innerHTML = `<a href="${deviggerUrl}" target="_blank" style="background: #0284c7; color: #ffffff; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-size: 0.9em; font-weight: bold;">Open in Devigger ↗</a>`;
+  // The popup puts a blank line (two <br>s) before its table; drop the second one so the
+  // button sits right under the market line instead of after an empty line.
+  const prevElementSkippingText = (node) => {
+    let n = node.previousSibling;
+    while (n && n.nodeType === Node.TEXT_NODE && !n.textContent.trim()) n = n.previousSibling;
+    return n;
+  };
+  const brBefore = prevElementSkippingText(linkContainer);
+  if (brBefore && brBefore.tagName === 'BR') {
+    const brBeforeThat = prevElementSkippingText(brBefore);
+    if (brBeforeThat && brBeforeThat.tagName === 'BR') brBefore.style.display = 'none';
+  }
+
+  const existingLink = linkContainer.querySelector('a.cno-devigger-btn');
+  if (existingLink && existingLink.getAttribute('href') === deviggerUrl) return;
+  linkContainer.innerHTML = `<a href="${deviggerUrl}" target="_blank" rel="noopener" class="cno-devigger-btn">Open in Devigger <span aria-hidden="true">↗</span></a>`;
 }
 
 function injectModalBadges() {
@@ -608,6 +626,14 @@ function processNoticeDismiss() {
 
   const text = getNoticeText(label);
   if (!text) {
+    removeControls();
+    label.style.display = '';
+    return;
+  }
+
+  // Site error messages (e.g. "Error Code 0: Network error detected...") always show and can't be dismissed.
+  // The saved dismissal is left alone, so a dismissed notice stays hidden once the error clears.
+  if (/^error\b/i.test(text)) {
     removeControls();
     label.style.display = '';
     return;
