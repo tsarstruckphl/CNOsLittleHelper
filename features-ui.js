@@ -51,8 +51,8 @@ function annotateGameHeaderTooltips() {
     const fullName = BOOK_HEADER_FULLNAME_MAP[shortCode];
 
     if (fullName) {
-      th.title = fullName;
-      th.style.cursor = 'help';
+      th.removeAttribute('title');
+      th.style.cursor = 'pointer';
     }
     th.dataset.hasHeaderTooltip = "true";
   });
@@ -137,7 +137,13 @@ function updateDeviggerLink(popup) {
 
   if (!fairOdds || !finalOdds) return;
 
-  let deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(fairOdds)}&FinalOdds=${encodeURIComponent(finalOdds)}`;
+  const popupText = (suffix) => {
+    const el = activeTab.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`) || popup.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`);
+    return el ? getOwnText(el).trim() : '';
+  };
+  const legOdds = cnoBuildDeviggerLegOdds(fairOdds, popupText('EventName'), popupText('_Market'), popupText('BetName'));
+
+  let deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(legOdds)}&FinalOdds=${encodeURIComponent(finalOdds)}`;
   if (boostVal) {
     deviggerUrl += `&Boost_Bool=1&Boost_Text=${encodeURIComponent(boostVal)}&Boost_Type=0`;
   }
@@ -362,6 +368,15 @@ function setupGameRightClickDevigger() {
     const row = targetCell.closest('tr');
     if (!row) return;
 
+    // Not on the Fair Odds column itself (there's nothing to devig against)
+    if (!row.classList.contains('footable-row-detail')) {
+      const th = targetTable.querySelectorAll('thead th')[targetCell.cellIndex];
+      if (th && th.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === 'fair odds') return;
+    } else {
+      const detailItem = e.target.closest('.footable-row-detail-inner > div');
+      if (detailItem && /fair odds/i.test(detailItem.textContent)) return;
+    }
+
     let fairOdds = '';
     let cellOdds = extractAmericanOdds(targetCell.textContent);
 
@@ -388,7 +403,18 @@ function setupGameRightClickDevigger() {
     const existingMenu = document.getElementById('cno-context-menu');
     if (existingMenu) existingMenu.remove();
 
-    const deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(fairOdds)}&FinalOdds=${encodeURIComponent(cellOdds)}`;
+    const mainRow = row.classList.contains('footable-row-detail') ? row.previousElementSibling : row;
+    const nameCell = mainRow ? mainRow.children[0] : null;
+    const gameEventEl = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_LabelEventName');
+    const gameMarketEl = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_DropDownListMarket');
+    const legOdds = cnoBuildDeviggerLegOdds(
+      fairOdds,
+      gameEventEl ? gameEventEl.textContent : '',
+      gameMarketEl && gameMarketEl.selectedIndex >= 0 ? gameMarketEl.options[gameMarketEl.selectedIndex].text : '',
+      nameCell && typeof getCleanCellText === 'function' ? getCleanCellText(nameCell) : (nameCell ? nameCell.textContent : '')
+    );
+
+    const deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(legOdds)}&FinalOdds=${encodeURIComponent(cellOdds)}`;
 
     const menu = document.createElement('div');
     menu.id = 'cno-context-menu';
@@ -502,6 +528,7 @@ function cnoGetDismissedUpdateVersion() {
 
 function processUpdateBannerAlert() {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+  if (typeof CNO_IS_FIREFOX_BUILD !== 'undefined' && CNO_IS_FIREFOX_BUILD) return;
 
   chrome.storage.local.get(['updateAvailable', 'latestVersion', 'releasePageUrl'], (data) => {
     const existingBanner = document.getElementById('cno-update-banner-alert');
@@ -734,6 +761,7 @@ function processAccordionPanes() {
 function applyModernUiClass() {
   if (typeof userSettingsLoaded === 'undefined' || !userSettingsLoaded) return;
   document.documentElement.classList.toggle('cno-modern-ui', !!userSettings.enableFilterModernization);
+  document.documentElement.classList.toggle('cno-game-page', window.location.pathname.toLowerCase().includes('game.aspx'));
 }
 
 // Marks the <br> spacers sitting directly above the Update panel so the modern CSS can collapse them
@@ -749,5 +777,1081 @@ function processModernSpacing() {
       break;
     }
     el = el.previousElementSibling;
+  }
+}
+
+// ====================================================
+// GAME PAGE: HIDE UNWANTED BOOK COLUMNS (option)
+// Columns whose header matches the ShortCode of an unchecked book are hidden.
+// ====================================================
+
+let cnoGameBooks = null;          // from the Google Sheet
+let cnoGameBookVisibility = {};   // user choices
+let cnoGameBooksRequested = false;
+
+let cnoGameBookVisLoaded = false;
+
+function ensureGameBookData() {
+  if (cnoGameBooksRequested) return;
+  cnoGameBooksRequested = true;
+  // Start from the saved copy of the book list (instant), then refresh it from the sheet
+  chrome.storage.local.get({ [CNO_GAME_BOOK_VIS_KEY]: {}, [CNO_BOOKS_CACHE_KEY]: '' }, (d) => {
+    cnoGameBookVisibility = d[CNO_GAME_BOOK_VIS_KEY] || {};
+    cnoGameBookVisLoaded = true;
+    const cached = parseBooksCsv(d[CNO_BOOKS_CACHE_KEY]);
+    if (cached.length && !cnoGameBooks) cnoGameBooks = cached;
+    cnoRunGameTablePass();
+  });
+  loadBooksList((books) => {
+    if (books && books.length) cnoGameBooks = books;
+    else if (!cnoGameBooks) cnoGameBooks = []; // nothing available: don't hold the table back
+    processGameBookColumns();
+    cnoRunGameTablePass();
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[CNO_GAME_BOOK_VIS_KEY]) {
+      cnoGameBookVisibility = changes[CNO_GAME_BOOK_VIS_KEY].newValue || {};
+      processGameBookColumns();
+    }
+  });
+}
+
+function processGameBookColumns() {
+  if (!window.location.pathname.toLowerCase().includes('game.aspx')) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const on = !!(typeof userSettings !== 'undefined' && userSettings.hideUnwantedGameBooks);
+
+  if (!on || !table) {
+    if (table) table.querySelectorAll('.cno-col-hidden.cno-book-col').forEach(el => el.classList.remove('cno-col-hidden', 'cno-book-col'));
+    return;
+  }
+
+  ensureGameBookData();
+  if (!cnoGameBooks) return;
+
+  const hiddenCodes = new Set(cnoGameBooks.filter(b => !isBookShown(b, cnoGameBookVisibility)).map(b => b.shortCode));
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  const rows = Array.from(table.querySelectorAll('tbody tr:not(.footable-row-detail)'));
+
+  ths.forEach((th, idx) => {
+    const code = th.textContent.replace(/\s+/g, '').toUpperCase();
+    const hide = hiddenCodes.has(code);
+    const cells = [th].concat(rows.map(r => r.children[idx]).filter(Boolean));
+    cells.forEach(cell => {
+      if (hide) cell.classList.add('cno-col-hidden', 'cno-book-col');
+      else if (cell.classList.contains('cno-book-col')) cell.classList.remove('cno-col-hidden', 'cno-book-col');
+    });
+  });
+}
+
+// ====================================================
+// GAME PAGE: FILTER BY A BOOK'S COLUMN (header menu)
+// Hover (or click) a book's header: Filter to Best Odds / >= FV / Best Odds or >= FV.
+// Rows come in groups (2 per line, or 3 for "3-way" markets); a group is kept when any of its
+// rows matches, so the other side(s) of a line always come along.
+// ====================================================
+
+let cnoGameColFilter = null; // { code, mode: 'best' | 'fv' | 'either' }
+
+const GAME_FILTER_MODES = [
+  { mode: 'nonblank', label: 'Refine to non-blank', short: 'Non-blank' },
+  { mode: 'best', label: 'Refine to Best Odds', short: 'Best Odds' },
+  { mode: 'fv', label: 'Refine to >= FV', short: '>= FV' },
+  { mode: 'either', label: 'Refine to Best Odds or >= FV', short: 'Best Odds or >= FV' }
+];
+
+function getGameTable() {
+  if (!window.location.pathname.toLowerCase().includes('game.aspx')) return null;
+  return document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+}
+
+function getGameColumns(table) {
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  const cols = { betName: -1, best: -1, fair: -1, books: [] };
+  ths.forEach((th, i) => {
+    const txt = th.textContent.replace(/\s+/g, ' ').trim();
+    const low = txt.toLowerCase();
+    if (low === 'bet name') cols.betName = i;
+    else if (low === 'best') cols.best = i;
+    else if (low === 'fair odds') cols.fair = i;
+    else if (txt) cols.books.push({ idx: i, code: txt.replace(/\s+/g, '').toUpperCase(), th });
+  });
+  return cols;
+}
+
+function getGameBookFullName(code) {
+  return BOOK_HEADER_FULLNAME_MAP[code] || code;
+}
+
+function getGameMarketName() {
+  const sel = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_DropDownListMarket');
+  return sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text.trim() : '';
+}
+
+function americanToDecimal(odds) {
+  const n = parseInt(odds, 10);
+  if (isNaN(n) || n === 0) return null;
+  return n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
+}
+
+function cellOdds(cell) {
+  if (!cell) return null;
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll('[class^="cno-"], [class*=" cno-"]').forEach(el => el.remove());
+  return extractAmericanOdds(clone.textContent);
+}
+
+function getGameDataRows(table) {
+  // Skip the "no results" row (a single cell spanning the table)
+  return Array.from(table.querySelectorAll('tbody tr:not(.footable-row-detail)'))
+    .filter(r => r.children.length > 1);
+}
+
+function setGameColFilter(code, mode) {
+  cnoGameColFilter = { code, mode };
+  // Filtering turns "Pair 2-/3-way lines" on (if the table restyle is on), so each kept line
+  // shows next to its other side(s). The user can switch pairing back off from the toolbar.
+  if (typeof isGameTableModern === 'function' && isGameTableModern() && !cnoGamePairLines) {
+    cnoGamePairLines = true;
+    try { chrome.storage.local.set({ [CNO_GAME_PAIR_KEY]: true }); } catch (e) { /* ignore */ }
+    const bar = document.getElementById('cno-gt-toolbar');
+    if (bar) bar.remove(); // rebuilt with the toggle shown on
+    processGameTableModern();
+    processGameRowOrdering();
+  }
+  processGameColFilter();
+}
+
+function clearGameColFilter() {
+  cnoGameColFilter = null;
+  processGameColFilter();
+}
+
+function processGameColFilter() {
+  const table = getGameTable();
+  let banner = document.getElementById('cno-game-filter-banner');
+
+  if (!cnoGameColFilter || !table) {
+    if (!cnoGameColFilter) {
+      if (banner) banner.remove();
+      document.querySelectorAll('.cno-game-hidden').forEach(el => el.classList.remove('cno-game-hidden'));
+    }
+    return;
+  }
+
+  const cols = getGameColumns(table);
+  const book = cols.books.find(b => b.code === cnoGameColFilter.code);
+  const rows = getGameDataRows(table);
+  const groupSize = /3-way/i.test(getGameMarketName()) ? 3 : 2;
+
+  const rowMatches = (row) => {
+    if (!book) return false;
+    const v = cellOdds(row.children[book.idx]);
+    if (!v) return false;
+    if (cnoGameColFilter.mode === 'nonblank') return true; // any odds in this book's cell
+    const best = cols.best !== -1 ? cellOdds(row.children[cols.best]) : null;
+    const fair = cols.fair !== -1 ? cellOdds(row.children[cols.fair]) : null;
+    const isBest = !!best && parseInt(v, 10) === parseInt(best, 10);
+    const dv = americanToDecimal(v), df = fair ? americanToDecimal(fair) : null;
+    const beatsFv = dv !== null && df !== null && dv >= df;
+    if (cnoGameColFilter.mode === 'best') return isBest;
+    if (cnoGameColFilter.mode === 'fv') return beatsFv;
+    return isBest || beatsFv;
+  };
+
+  const groups = groupGameRows(rows, cols, groupSize); // row order is handled by processGameRowOrdering()
+
+  for (const group of groups) {
+    const keep = group.some(rowMatches);
+    group.forEach(row => {
+      row.classList.toggle('cno-game-hidden', !keep);
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-game-hidden', !keep);
+    });
+  }
+
+  // Notice pinned with the table header (same style as the hedge sportsbook notice)
+  if (!banner) {
+    banner = document.createElement('tr');
+    banner.id = 'cno-game-filter-banner';
+    const cell = document.createElement('td');
+    cell.className = 'cno-game-filter-cell';
+    cell.style.cssText = 'text-align: left; padding: 4px 0 5px 0; background: #ffffff; border: none;';
+    const pill = document.createElement('span');
+    pill.style.cssText = `
+      display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px;
+      background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 6px;
+      color: #0369a1; font-size: 0.8rem; font-weight: 600;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+    const label = document.createElement('span');
+    label.className = 'cno-game-filter-label';
+    const pillIcon = document.createElement('span');
+    pillIcon.innerHTML = ROWS_FILTER_ICON_SVG;
+    pillIcon.style.cssText = 'display:inline-flex; margin-right:-2px;';
+    pill.appendChild(pillIcon);
+    const x = document.createElement('span');
+    x.setAttribute('role', 'button');
+    x.title = 'Remove this refinement';
+    x.textContent = '✕';
+    x.style.cssText = 'cursor:pointer; padding:0 5px; border-radius:3px; font-weight:700; line-height:1.3;';
+    x.addEventListener('mouseover', () => { x.style.background = '#bae6fd'; });
+    x.addEventListener('mouseout', () => { x.style.background = 'none'; });
+    x.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); clearGameColFilter(); });
+    pill.appendChild(label);
+    pill.appendChild(x);
+    cell.appendChild(pill);
+    banner.appendChild(cell);
+  }
+  const modeInfo = GAME_FILTER_MODES.find(m => m.mode === cnoGameColFilter.mode);
+  const text = `Refined to ${getGameBookFullName(cnoGameColFilter.code)}: ${modeInfo ? modeInfo.short : ''}`;
+  const label = banner.querySelector('.cno-game-filter-label');
+  if (label.textContent !== text) label.textContent = text;
+
+  const thead = table.querySelector('thead');
+  if (!thead) return;
+  const cell = banner.querySelector('.cno-game-filter-cell');
+  const count = Math.max(1, table.querySelectorAll('thead th').length);
+  if (String(cell.colSpan) !== String(count)) cell.colSpan = count;
+  if (banner.parentNode !== thead || thead.firstElementChild !== banner) thead.insertBefore(banner, thead.firstChild);
+}
+
+// Groups a line with its other side(s). Rows aren't always in neat pairs (a line can be missing
+// its partner), so group by content instead of position:
+//   1) same name once Over/Under/Yes/No and the number are removed, plus the same |number|
+//      ("Zach Edey Over 7.5" + "Zach Edey Under 7.5", "Over 145.5" + "Under 145.5")
+//   2) leftovers with the same |number| ("Sixers +4.5" + "Pacers -4.5"); with no number,
+//      all leftovers together (moneyline sides, or Home/Tie/Away in a 3-way market)
+function groupGameRows(rows, cols, groupSize) {
+  const info = rows.map(row => {
+    const nameCell = cols.betName !== -1 ? row.children[cols.betName] : row.children[0];
+    const name = nameCell ? getCleanCellText(nameCell) : '';
+    const m = name.match(/([+-]?\d+(?:\.\d+)?)\s*$/);
+    const num = m ? String(Math.abs(parseFloat(m[1]))) : '';
+    const residual = name
+      .replace(/([+-]?\d+(?:\.\d+)?)\s*$/, '')
+      .replace(/\b(over|under|yes|no)\b/gi, '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+    return { row, key: `${residual}|${num}`, num };
+  });
+
+  const byKey = new Map();
+  info.forEach(x => {
+    if (!byKey.has(x.key)) byKey.set(x.key, []);
+    byKey.get(x.key).push(x);
+  });
+
+  const groups = [];
+  const leftovers = new Map();
+  byKey.forEach(list => {
+    if (list.length >= 2) groups.push(list.map(x => x.row));
+    else list.forEach(x => {
+      if (!leftovers.has(x.num)) leftovers.set(x.num, []);
+      leftovers.get(x.num).push(x.row);
+    });
+  });
+  leftovers.forEach(list => groups.push(list));
+  return groups;
+}
+
+// Header hover menu
+let cnoGameHeaderMenu = null;
+let cnoGameHeaderHideTimer = null;
+
+function hideGameHeaderMenu() {
+  if (cnoGameHeaderHideTimer) { clearTimeout(cnoGameHeaderHideTimer); cnoGameHeaderHideTimer = null; }
+  if (cnoGameHeaderMenu) { cnoGameHeaderMenu.remove(); cnoGameHeaderMenu = null; }
+}
+
+function scheduleHideGameHeaderMenu() {
+  if (cnoGameHeaderHideTimer) clearTimeout(cnoGameHeaderHideTimer);
+  cnoGameHeaderHideTimer = setTimeout(hideGameHeaderMenu, 180);
+}
+
+function showGameHeaderMenu(th, code) {
+  if (!isGameTableModern()) return; // classic table: headers just show the book's name on hover
+  if (cnoGameHeaderHideTimer) { clearTimeout(cnoGameHeaderHideTimer); cnoGameHeaderHideTimer = null; }
+  if (cnoGameHeaderMenu && cnoGameHeaderMenu.dataset.code === code) return;
+  hideGameHeaderMenu();
+
+  const menu = document.createElement('div');
+  menu.dataset.code = code;
+  menu.style.cssText = `
+    position: fixed; z-index: 1000001; min-width: 210px;
+    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(15,23,42,0.16); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  `;
+  const head = document.createElement('div');
+  head.textContent = getGameBookFullName(code);
+  head.style.cssText = 'padding: 7px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b;';
+  menu.appendChild(head);
+
+  const list = document.createElement('div');
+  list.style.cssText = 'padding: 4px;';
+  GAME_FILTER_MODES.forEach(m => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.textContent = m.label;
+    const active = cnoGameColFilter && cnoGameColFilter.code === code && cnoGameColFilter.mode === m.mode;
+    item.style.cssText = `display:block; width:100%; text-align:left; background:${active ? '#e0f2fe' : 'none'}; border:none; padding:7px 10px; border-radius:5px; font-size:0.84rem; font-weight:600; color:#0369a1; cursor:pointer;`;
+    item.addEventListener('mouseover', () => item.style.background = '#f0f9ff');
+    item.addEventListener('mouseout', () => item.style.background = active ? '#e0f2fe' : 'none');
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideGameHeaderMenu();
+      setGameColFilter(code, m.mode);
+    });
+    list.appendChild(item);
+  });
+  menu.appendChild(list);
+
+  menu.addEventListener('mouseenter', () => { if (cnoGameHeaderHideTimer) { clearTimeout(cnoGameHeaderHideTimer); cnoGameHeaderHideTimer = null; } });
+  menu.addEventListener('mouseleave', scheduleHideGameHeaderMenu);
+  document.body.appendChild(menu);
+  cnoGameHeaderMenu = menu;
+
+  const r = th.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${r.bottom + 2}px`;
+}
+
+function processGameHeaderFilterMenus() {
+  const table = getGameTable();
+  if (!table) return;
+  const modern = isGameTableModern();
+  getGameColumns(table).books.forEach(({ th, code }) => {
+    // Classic table: the book's full name as a hover tooltip, no filter menu.
+    // Enhanced table: no tooltip (the filter menu shows the name).
+    const fullName = getGameBookFullName(code);
+    if (!modern && fullName !== code) {
+      if (th.title !== fullName) th.title = fullName;
+    } else if (th.hasAttribute('title')) {
+      th.removeAttribute('title');
+    }
+    th.style.cursor = modern ? 'pointer' : 'help';
+    if (th.dataset.cnoFilterMenu) return;
+    th.dataset.cnoFilterMenu = 'true';
+    th.addEventListener('mouseenter', () => showGameHeaderMenu(th, code));
+    th.addEventListener('mouseleave', scheduleHideGameHeaderMenu);
+    th.addEventListener('click', () => showGameHeaderMenu(th, code));
+  });
+}
+
+window.addEventListener('scroll', hideGameHeaderMenu, true);
+
+// ====================================================
+// GAME PAGE: QR BUTTON ON ODDS CELLS (when Deeplinks is on)
+// ====================================================
+
+function processGameQrButtons() {
+  const table = getGameTable();
+  if (!table) return;
+  const deep = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_CheckBoxDeepLinkOddsScreen');
+  if (!deep || !deep.checked) {
+    table.querySelectorAll('.cno-game-qr').forEach(el => el.remove());
+    return;
+  }
+  if (typeof createQrBtn !== 'function' || typeof getHoverTray !== 'function') return;
+
+  const cols = getGameColumns(table);
+  getGameDataRows(table).forEach(row => {
+    cols.books.forEach(({ idx, code }) => {
+      const cell = row.children[idx];
+      if (!cell || cell.querySelector('.cno-qr-btn')) return;
+      const link = cell.querySelector('a[href]');
+      if (!link || !/^https?:/i.test(link.href)) return;
+      const btn = createQrBtn(link, () => getGameBookFullName(code), () => {
+        const nameCell = cols.betName !== -1 ? row.children[cols.betName] : null;
+        const eventEl = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_LabelEventName');
+        return {
+          event: eventEl ? eventEl.textContent.trim() : '',
+          market: getGameMarketName(),
+          betName: nameCell ? getCleanCellText(nameCell) : '',
+          odds: cellOdds(cell) || ''
+        };
+      });
+      btn.classList.add('cno-game-qr');
+      const tray = getHoverTray(cell);
+      tray.classList.add('cno-hover-tray-above'); // sits on the cell's top edge so the odds stay visible
+      tray.appendChild(btn);
+    });
+  });
+}
+
+// While a game filter is on, move each line's other side(s) right under it, so pairs stay
+// together even when the site lists them apart. The original order is restored when cleared.
+function keepGameGroupsTogether(table, rows, groups) {
+  const tbody = table.querySelector('tbody');
+  if (!tbody || !rows.length) return;
+
+  rows.forEach((row, i) => { if (row.dataset.cnoOrigIndex === undefined) row.dataset.cnoOrigIndex = String(i); });
+
+  const ordered = groups
+    .map(g => g.slice().sort((a, b) => +a.dataset.cnoOrigIndex - +b.dataset.cnoOrigIndex))
+    .sort((a, b) => +a[0].dataset.cnoOrigIndex - +b[0].dataset.cnoOrigIndex)
+    .flat();
+
+  const current = Array.from(tbody.querySelectorAll(':scope > tr:not(.footable-row-detail)')).filter(r => r.children.length > 1);
+  if (current.length === ordered.length && current.every((r, i) => r === ordered[i])) return; // already in place
+
+  ordered.forEach(row => {
+    const detail = row.nextElementSibling && row.nextElementSibling.classList.contains('footable-row-detail') ? row.nextElementSibling : null;
+    tbody.appendChild(row);
+    if (detail) tbody.appendChild(detail);
+  });
+}
+
+function restoreGameRowOrder(table) {
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll(':scope > tr[data-cno-orig-index]'));
+  if (!rows.length) return;
+  // Nothing to do if they're already in the original order
+  const inOrder = rows.every((r, i) => i === 0 || +rows[i - 1].dataset.cnoOrigIndex < +r.dataset.cnoOrigIndex);
+  if (inOrder) return;
+  rows.sort((a, b) => +a.dataset.cnoOrigIndex - +b.dataset.cnoOrigIndex).forEach(row => {
+    const detail = row.nextElementSibling && row.nextElementSibling.classList.contains('footable-row-detail') ? row.nextElementSibling : null;
+    tbody.appendChild(row);
+    if (detail) tbody.appendChild(detail);
+  });
+}
+
+// ====================================================
+// GAME PAGE: COMPACT FILTER CARD (Modernized UI only)
+// Gathers Market / Sub-market / Devig Method / Deeplinks / right-click devig / Update into a
+// two-row card instead of one control per line. The site redraws this area on every update,
+// so it's rebuilt each time (the controls themselves are the site's own, just moved).
+// ====================================================
+
+function processGameFilterLayout() {
+  if (!window.location.pathname.toLowerCase().includes('game.aspx')) return;
+  if (typeof userSettings === 'undefined' || !userSettings.enableFilterModernization) return;
+
+  const panel = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView');
+  if (!panel || panel.querySelector('#cno-game-filter-card')) return;
+
+  const byId = (id) => document.getElementById(`ContentPlaceHolderMain_ContentPlaceHolderRight_${id}`);
+  const market = byId('DropDownListMarket');
+  if (!market || market.parentNode !== panel) return;
+  const sub = byId('DropDownListSubMarket');
+  const devig = panel.querySelector('select[id$="DropDownListDevigMethod"]');
+  const deep = byId('CheckBoxDeepLinkOddsScreen');
+  const deepLabel = deep ? panel.querySelector(`label[for="${deep.id}"]`) : null;
+  const rightClick = document.getElementById('cno-wrap-rightclick-devig');
+  const helpLink = panel.querySelector('a[href*="cno-devig-methods"]');
+  const updateBtn = byId('ButtonUpdate');
+  const updateFaux = byId('ButtonUpdate_Faux');
+
+  const card = document.createElement('div');
+  card.id = 'cno-game-filter-card';
+  panel.insertBefore(card, market);
+
+  const field = (labelText, control, extra) => {
+    const f = document.createElement('div');
+    f.className = 'cno-gf-field';
+    const l = document.createElement('span');
+    l.className = 'cno-gf-label';
+    l.textContent = labelText;
+    if (extra) l.appendChild(extra);
+    f.appendChild(l);
+    f.appendChild(control);
+    return f;
+  };
+
+  const row1 = document.createElement('div');
+  row1.className = 'cno-gf-row';
+  row1.appendChild(field('Market', market));
+  if (sub) row1.appendChild(field('Sub-market', sub));
+
+  const row2 = document.createElement('div');
+  row2.className = 'cno-gf-row';
+  if (devig) {
+    let help = null;
+    if (helpLink) {
+      help = helpLink;
+      help.textContent = '(Help)';
+      help.className = 'cno-gf-help';
+      help.target = '_blank';
+      help.tabIndex = -1;
+    }
+    row2.appendChild(field('Devig Method', devig, help));
+  }
+
+  const checks = document.createElement('div');
+  checks.className = 'cno-gf-checks';
+  if (deep) {
+    const wrap = document.createElement('span');
+    wrap.className = 'cno-gf-check';
+    wrap.appendChild(deep);
+    if (deepLabel) wrap.appendChild(deepLabel);
+    checks.appendChild(wrap);
+  }
+  if (rightClick) {
+    rightClick.style.marginLeft = '0';
+    rightClick.classList.add('cno-gf-check');
+    checks.appendChild(rightClick);
+  }
+  if (checks.children.length) row2.appendChild(checks);
+
+  card.appendChild(row1);
+  card.appendChild(row2);
+
+  // Update button sits just below the card, on the left
+  if (updateBtn) {
+    card.insertAdjacentElement('afterend', updateBtn);
+    if (updateFaux) updateBtn.insertAdjacentElement('afterend', updateFaux);
+  }
+
+  // Clean up the line breaks and leftover labels ("Devig Method:", "(See: ... )") the controls left behind
+  let n = card.nextSibling;
+  while (n) {
+    const next = n.nextSibling;
+    if (n.nodeType === Node.ELEMENT_NODE) {
+      if (n.id === 'ContentPlaceHolderMain_ContentPlaceHolderRight_TimerAjaxDelayedLoad') break;
+      if (n.tagName === 'BR') n.remove();
+      else if (n.tagName === 'SPAN' || n.tagName === 'DIV' || n.tagName === 'TABLE') break;
+    } else if (n.nodeType === Node.TEXT_NODE) {
+      if (/devig method:|\(see:|^\s*\)\s*$|^\s*$/i.test(n.textContent)) n.remove();
+    }
+    n = next;
+  }
+}
+
+// ====================================================
+// PAGE HEADER (Modernized UI only)
+// - Tool pages: "Last Updated ... [Refresh]" moves onto the title line, right-aligned and muted.
+// - Game pages: Sport-League / Event / Start time become a compact two-line banner, with
+//   "Last Updated ... [Refresh]" on the right of the Sport-League line.
+// The site's own elements are moved, not copied (the Last Updated box keeps refreshing itself).
+// ====================================================
+
+function processPageHeaderLayout() {
+  if (typeof userSettings === 'undefined' || !userSettings.enableFilterModernization) return;
+  const serverInfo = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo');
+  if (!serverInfo || serverInfo.dataset.cnoPlaced) return;
+
+  const removeBrsBetween = (start, stopEl) => {
+    let n = start;
+    while (n && n !== stopEl) {
+      const next = n.nextSibling;
+      if ((n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR') ||
+          (n.nodeType === Node.TEXT_NODE && !n.textContent.trim())) n.remove();
+      n = next;
+    }
+  };
+
+  const byId = (id) => document.getElementById(`ContentPlaceHolderMain_ContentPlaceHolderRight_${id}`);
+  const sportLeague = byId('LabelSportLeague');
+  const eventName = byId('LabelEventName');
+  const startDate = byId('LabelStartDate');
+
+  if (window.location.pathname.toLowerCase().includes('game.aspx') && sportLeague && eventName) {
+    const grid = byId('UpdatePanelGridView');
+    const header = document.createElement('div');
+    header.id = 'cno-game-header';
+    sportLeague.parentNode.insertBefore(header, sportLeague);
+
+    const top = document.createElement('div');
+    top.className = 'cno-gh-top';
+    sportLeague.classList.add('cno-gh-league');
+    top.appendChild(sportLeague);
+    top.appendChild(serverInfo);
+
+    const main = document.createElement('div');
+    main.className = 'cno-gh-main';
+    eventName.classList.add('cno-gh-event');
+    main.appendChild(eventName);
+    if (startDate) {
+      startDate.classList.add('cno-gh-date');
+      main.appendChild(startDate);
+    }
+
+    header.appendChild(top);
+    header.appendChild(main);
+    serverInfo.dataset.cnoPlaced = 'true';
+
+    // Drop the line breaks that used to separate these lines
+    removeBrsBetween(header.nextSibling, grid || null);
+    let p = header.previousSibling;
+    while (p && ((p.nodeType === Node.ELEMENT_NODE && p.tagName === 'BR') || (p.nodeType === Node.TEXT_NODE && !p.textContent.trim()))) {
+      const prev = p.previousSibling;
+      p.remove();
+      p = prev;
+    }
+    return;
+  }
+
+  // Tool pages: put it on the title (h1) line
+  const h1 = serverInfo.parentNode ? serverInfo.parentNode.querySelector(':scope > h1') : null;
+  if (!h1) return;
+  const row = document.createElement('div');
+  row.id = 'cno-title-row';
+  h1.parentNode.insertBefore(row, h1);
+  removeBrsBetween(serverInfo.nextSibling, row);
+  row.appendChild(h1);
+  row.appendChild(serverInfo);
+  serverInfo.dataset.cnoPlaced = 'true';
+
+  // The title used to be followed by a blank line; the card's own margin is enough
+  let n = row.nextSibling;
+  while (n && n.nodeType === Node.TEXT_NODE && !n.textContent.trim()) n = n.nextSibling;
+  if (n && n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR') n.remove();
+}
+
+// Game page: keep the header banner and filter card exactly as wide as the odds table
+// (the table's width changes with the number of book columns shown)
+function processGameHeaderWidths() {
+  if (!window.location.pathname.toLowerCase().includes('game.aspx')) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const boxes = [document.getElementById('cno-game-header'), document.getElementById('cno-game-filter-card')].filter(Boolean);
+  if (!boxes.length) return;
+  const width = table ? Math.round(table.getBoundingClientRect().width) : 0;
+  boxes.forEach(box => {
+    const want = width > 0 ? `${width}px` : '';
+    if (box.style.width !== want) box.style.width = want;
+  });
+}
+
+// ====================================================
+// GAME PAGE: MODERNIZED ODDS TABLE (Modernized UI only)
+// - Toolbar above the table: [Hide empty books] (off each visit), [Pair 2-/3-way lines]
+//   (remembered), "Highlight liquidity under $[100]" (remembered)
+// - Exchange cells: odds on top, "$liquidity · price¢" in small grey below (amber when
+//   liquidity is under the threshold), so those columns are much narrower
+// - Cells centered and top-aligned; Bet Name column tinted; Best / Fair Odds set apart
+// The site's cell colors (best / EV highlights) are left as they are.
+// ====================================================
+
+const CNO_GAME_PAIR_KEY = 'cno_game_pair_lines';
+const CNO_GAME_LIQ_KEY = 'cno_game_liq_threshold';
+let cnoGamePairLines = false;
+let cnoGameLiqThreshold = 100;
+let cnoGameHideEmpty = false; // per visit, on purpose: you usually want to see which books are missing
+let cnoGamePrefsLoaded = false;
+let cnoGamePrefsReady = false; // the table isn't revealed until these are known (no reorder jump)
+
+function loadGameTablePrefs() {
+  if (cnoGamePrefsLoaded) return;
+  cnoGamePrefsLoaded = true;
+  try {
+    chrome.storage.local.get({ [CNO_GAME_PAIR_KEY]: false, [CNO_GAME_LIQ_KEY]: 100 }, (d) => {
+      cnoGamePairLines = !!d[CNO_GAME_PAIR_KEY];
+      const n = Number(d[CNO_GAME_LIQ_KEY]);
+      cnoGameLiqThreshold = isFinite(n) && n >= 0 ? n : 100;
+      cnoGamePrefsReady = true;
+      const box = document.getElementById('cno-gt-toolbar');
+      if (box) box.remove(); // rebuild with the loaded values
+      cnoRunGameTablePass();
+    });
+  } catch (e) { cnoGamePrefsReady = true; }
+}
+
+function isGameTableModern() {
+  return window.location.pathname.toLowerCase().includes('game.aspx') &&
+    typeof userSettings !== 'undefined' && userSettings.modernizeGameTable !== false;
+}
+
+function makeGameToolbarToggle(label, on, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'cno-gt-toggle' + (on ? ' is-on' : '');
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.innerHTML = '<span class="cno-gt-check" aria-hidden="true"></span>';
+  b.appendChild(document.createTextNode(label));
+  b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
+  return b;
+}
+
+function ensureGameTableToolbar(table) {
+  // The toolbar is a row inside the table's (sticky) header, just above the column headings,
+  // so it stays in view while scrolling. It uses a <td>, so "thead th" column lookups are unaffected.
+  const thead = table.querySelector('thead');
+  const firstTh = thead ? thead.querySelector('th') : null;
+  const headerRow = firstTh ? firstTh.parentElement : null;
+  if (!thead || !headerRow) return;
+  const colCount = Math.max(1, thead.querySelectorAll('th').length);
+
+  let bar = document.getElementById('cno-gt-toolbar');
+  if (bar && bar.parentNode === thead && bar.nextElementSibling === headerRow) {
+    const cell = bar.firstElementChild;
+    if (cell && String(cell.colSpan) !== String(colCount)) cell.colSpan = colCount;
+    return;
+  }
+  if (bar) bar.remove();
+
+  bar = document.createElement('tr');
+  bar.id = 'cno-gt-toolbar';
+  const barCell = document.createElement('td');
+  barCell.className = 'cno-gt-cell';
+  barCell.colSpan = colCount;
+  const inner = document.createElement('div');
+  inner.className = 'cno-gt-inner';
+  barCell.appendChild(inner);
+  bar.appendChild(barCell);
+
+  const rebuild = () => { const b = document.getElementById('cno-gt-toolbar'); if (b) b.remove(); processGameTableModern(); };
+
+  inner.appendChild(makeGameToolbarToggle('Hide empty books', cnoGameHideEmpty, () => {
+    cnoGameHideEmpty = !cnoGameHideEmpty;
+    rebuild();
+  }));
+  inner.appendChild(makeGameToolbarToggle('Pair 2-/3-way lines', cnoGamePairLines, () => {
+    cnoGamePairLines = !cnoGamePairLines;
+    try { chrome.storage.local.set({ [CNO_GAME_PAIR_KEY]: cnoGamePairLines }); } catch (e) { /* ignore */ }
+    rebuild();
+  }));
+
+  const liq = document.createElement('label');
+  liq.className = 'cno-gt-liq';
+  liq.appendChild(document.createTextNode('Highlight liquidity under $'));
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.step = '10';
+  input.value = String(cnoGameLiqThreshold);
+  input.dataset.hasEnterSubmit = 'true';
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); input.blur(); } });
+  input.addEventListener('input', () => {
+    const n = Number(input.value);
+    if (input.value === '' || !isFinite(n) || n < 0) return;
+    cnoGameLiqThreshold = n;
+    try { chrome.storage.local.set({ [CNO_GAME_LIQ_KEY]: n }); } catch (e) { /* ignore */ }
+    processGameTableModern();
+  });
+  liq.appendChild(input);
+  inner.appendChild(liq);
+
+  const classic = document.createElement('button');
+  classic.type = 'button';
+  classic.className = 'cno-gt-switch';
+  classic.textContent = '📜 Show classic table';
+  classic.title = 'Show the table the way CNO draws it (same as turning off "Restyle Game Odds Table" in the options)';
+  classic.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); setGameTableRestyle(false); });
+  inner.appendChild(classic);
+
+  thead.insertBefore(bar, headerRow);
+}
+
+// "+326 ($59 @ 23.5¢)" -> odds line + small "$59 · 23.5¢" line (class names avoid the "cno-" prefix
+// on purpose: helpers that read a cell's odds skip anything the extension added with that prefix)
+function splitExchangeCell(td) {
+  if (td.dataset.lhSplit) return;
+  const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    // Skip text inside things the extension added (QR tray, badges). Only look at elements
+    // *inside* the cell: the cell itself carries extension classes (e.g. cno-has-hover-tray).
+    let addedByExtension = false;
+    for (let el = node.parentElement; el && el !== td; el = el.parentElement) {
+      if (/(^|\s)cno-/.test(el.getAttribute('class') || '')) { addedByExtension = true; break; }
+    }
+    if (addedByExtension) continue;
+    // "+326 ($59 @ 23.5¢)" (exchanges) or "-110 ($2,000)" (liquidity only, e.g. Pinnacle)
+    const m = node.textContent.match(/^(\s*)([+-]\d+)\s*\(\$([\d,]+)(?:\s*@\s*([\d.]+)¢)?\)(\s*)$/);
+    if (!m) continue;
+    const frag = document.createDocumentFragment();
+    const odds = document.createElement('span');
+    odds.className = 'lh-odds';
+    odds.textContent = m[2];
+    const sub = document.createElement('span');
+    sub.className = 'lh-sub';
+    sub.dataset.liq = m[3].replace(/,/g, '');
+    const liq = document.createElement('span');
+    liq.className = 'lh-liq';
+    liq.textContent = `$${m[3]}`;
+    sub.appendChild(liq);
+    if (m[4]) {
+      const price = document.createElement('span');
+      price.className = 'lh-price';
+      price.textContent = `${m[4]}¢`;
+      sub.appendChild(document.createTextNode('\u2009·\u2009')); // thin spaces keep the column narrow
+      sub.appendChild(price);
+    }
+    frag.appendChild(odds);
+    frag.appendChild(sub);
+    td.dataset.lhOrigText = node.textContent; // to put the cell back for the classic table
+    node.parentNode.replaceChild(frag, node);
+    td.dataset.lhSplit = 'true';
+    return;
+  }
+}
+
+function processGameTableModern() {
+  const table = getGameTable();
+  if (!table) return;
+  if (!isGameTableModern()) {
+    // Option turned off: put the table back the way the site draws it
+    table.classList.remove('lh-modern');
+    const bar = document.getElementById('cno-gt-toolbar');
+    if (bar) bar.remove();
+    table.querySelectorAll('.lh-empty-hidden').forEach(el => el.classList.remove('lh-empty-hidden'));
+    const pendingStyle = document.getElementById('cno-gt-pending-style'); // restyle off: show the site's table as-is
+    if (pendingStyle) pendingStyle.remove();
+    restoreSplitCells(table);
+    if (cnoGameColFilter) clearGameColFilter(); // book filters are part of the enhanced table
+    ensureEnhancedTableButton(table);
+    return;
+  }
+  const classicBtn = document.getElementById('cno-gt-enhanced-btn');
+  if (classicBtn) classicBtn.remove();
+  loadGameTablePrefs();
+  table.classList.add('lh-modern');
+  ensureGameTableToolbar(table);
+
+  const cols = getGameColumns(table);
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  const rows = getGameDataRows(table);
+
+  // Column roles
+  ths.forEach((th, i) => {
+    th.classList.toggle('lh-ref', i === cols.best || i === cols.fair);
+    th.classList.toggle('lh-ref-end', i === cols.fair);
+    th.classList.toggle('lh-name', i === cols.betName);
+  });
+
+  // Which book columns have any odds
+  const hasOdds = new Set();
+  rows.forEach(row => {
+    cols.books.forEach(({ idx }) => {
+      const cell = row.children[idx];
+      if (cell && cellOdds(cell)) hasOdds.add(idx);
+    });
+  });
+
+  const threshold = cnoGameLiqThreshold;
+  const narrowCols = new Set();
+  rows.forEach(row => {
+    Array.from(row.children).forEach((td, i) => {
+      td.classList.toggle('lh-name', i === cols.betName);
+      td.classList.toggle('lh-ref', i === cols.best || i === cols.fair);
+      td.classList.toggle('lh-ref-end', i === cols.fair);
+      if (i !== cols.betName) splitExchangeCell(td);
+      const sub = td.querySelector('.lh-sub');
+      if (sub) {
+        sub.classList.toggle('lh-low', Number(sub.dataset.liq) < threshold);
+        narrowCols.add(i);
+      }
+    });
+  });
+
+  // Columns with liquidity lines: keep them as narrow as their contents (the table still fills
+  // the page; the spare width goes to the other columns)
+  ths.forEach((th, i) => th.classList.toggle('lh-narrow', narrowCols.has(i)));
+  rows.forEach(row => Array.from(row.children).forEach((td, i) => td.classList.toggle('lh-narrow', narrowCols.has(i))));
+  balanceNarrowColumns(table, cols);
+
+  // Hide empty books (header + cells)
+  cols.books.forEach(({ idx, th }) => {
+    const hide = cnoGameHideEmpty && !hasOdds.has(idx);
+    th.classList.toggle('lh-empty-hidden', hide);
+    rows.forEach(row => { const c = row.children[idx]; if (c) c.classList.toggle('lh-empty-hidden', hide); });
+  });
+}
+
+// Row order: lines are moved next to their other side(s), and each group banded, only when
+// "Pair 2-/3-way lines" is on. Otherwise the site's own order, even while a book filter is on
+// (the filter still keeps or hides each line together with its other side(s)).
+function processGameRowOrdering() {
+  const table = getGameTable();
+  if (!table) return;
+  const rows = getGameDataRows(table);
+  const pairing = isGameTableModern() && cnoGamePairLines;
+
+  if (!pairing) {
+    restoreGameRowOrder(table);
+    rows.forEach(r => r.classList.remove('lh-band-a', 'lh-band-b', 'lh-group-end'));
+    table.classList.remove('lh-paired');
+    if (isGameTableModern() && cnoCanRevealGameTable()) table.classList.add('lh-ready'); // restyle done: reveal
+    return;
+  }
+
+  const cols = getGameColumns(table);
+  const groups = groupGameRows(rows, cols, 2);
+  keepGameGroupsTogether(table, rows, groups);
+
+  table.classList.add('lh-paired');
+  if (cnoCanRevealGameTable()) table.classList.add('lh-ready');
+  groups
+    .map(g => g.slice().sort((a, b) => +a.dataset.cnoOrigIndex - +b.dataset.cnoOrigIndex))
+    .sort((a, b) => +a[0].dataset.cnoOrigIndex - +b[0].dataset.cnoOrigIndex)
+    .forEach((g, gi) => {
+      g.forEach((row, ri) => {
+        row.classList.toggle('lh-band-a', gi % 2 === 0);
+        row.classList.toggle('lh-band-b', gi % 2 === 1);
+        row.classList.toggle('lh-group-end', ri === g.length - 1);
+      });
+    });
+}
+
+// ====================================================
+// GAME PAGE: KEEP THE LINKED-TO LINE IN VIEW
+// Links into a game page (side_id=...) make the site scroll that line to the very top of the
+// window, which puts it behind the pinned table header (taller now with the toolbar), and
+// pairing can move rows after that scroll. For a few seconds after each table appears, if the
+// linked line is hidden behind the header, scroll just enough to show it below the header.
+// ====================================================
+
+function processGameFocusRow() {
+  const table = getGameTable();
+  if (!table) return;
+  let sideId = null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    sideId = params.get('side_id') || params.get('sideid');
+  } catch (e) { return; }
+  if (!sideId) return;
+
+  if (!table.dataset.lhBorn) table.dataset.lhBorn = String(Date.now());
+  if (Date.now() - Number(table.dataset.lhBorn) > 6000) return; // only right after it loads
+
+  const row = document.getElementById(sideId);
+  const thead = table.querySelector('thead');
+  if (!row || !thead || !table.contains(row)) return;
+
+  const headerBottom = thead.getBoundingClientRect().bottom;
+  const r = row.getBoundingClientRect();
+  // Hidden (fully or partly) behind the pinned header, but not scrolled far away
+  if (r.top < headerBottom && r.bottom > -5 && r.top > -r.height - 5) {
+    window.scrollBy(0, r.top - headerBottom - 8);
+  }
+}
+
+// ====================================================
+// GAME PAGE: RESTYLE THE TABLE THE MOMENT IT APPEARS
+// The regular 500ms pass can run late (or a slow step earlier in it can delay it), which let the
+// site's original table show briefly. A DOM observer restyles a new table right away, before the
+// browser paints it. It only acts while the page is waiting on a table (cno-gt-pending).
+// ====================================================
+
+// Reveal only once the remembered settings are known AND the page has finished loading. On the
+// first load the table arrives with the page's HTML and its rows are still being added while the
+// page loads; revealing it then showed the not-yet-restyled rows (the first-load flash).
+// Also wait for the extension's settings and, when "Hide unwanted books" is on, the book list:
+// otherwise the table showed every book first and then dropped the hidden ones (a big jump).
+function cnoCanRevealGameTable() {
+  if (!cnoGamePrefsReady || document.readyState === 'loading') return false;
+  if (typeof userSettingsLoaded !== 'undefined' && !userSettingsLoaded) return false;
+  if (typeof userSettings !== 'undefined' && userSettings.hideUnwantedGameBooks) {
+    if (!cnoGameBookVisLoaded || !cnoGameBooks) return false;
+  }
+  return true;
+}
+
+let cnoGameTablePassBusy = false;
+function cnoRunGameTablePass() {
+  if (cnoGameTablePassBusy) return;
+  cnoGameTablePassBusy = true;
+  try {
+    // Page layout around the table, done in the same pass so nothing above it jumps afterwards
+    processGameFilterLayout();
+    processPageHeaderLayout();
+    const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+    if (table) {
+      processGameBookColumns();
+      processGameColFilter();
+      processGameTableModern();
+      processGameRowOrdering();
+      processGameHeaderWidths();
+      processGameFocusRow();
+    }
+  } catch (e) {
+    console.warn('CNO Helper: game table restyle error', e);
+  } finally {
+    cnoGameTablePassBusy = false;
+  }
+}
+
+if (/game\.aspx/i.test(window.location.pathname)) {
+  loadGameTablePrefs();
+  document.addEventListener('DOMContentLoaded', () => cnoRunGameTablePass());
+  // While a table is waiting to be revealed (settings or book list still loading), retry often
+  setInterval(() => {
+    const t = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+    if (t && !t.classList.contains('lh-ready') && document.getElementById('cno-gt-pending-style')) cnoRunGameTablePass();
+  }, 50);
+  new MutationObserver(() => {
+    if (document.readyState === 'loading') return; // wait for the full table (see cnoCanRevealGameTable)
+    if (!document.getElementById('cno-gt-pending-style')) return;
+    const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+    if (!table || table.classList.contains('lh-ready')) return;
+    cnoRunGameTablePass();
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+
+// ====================================================
+// GAME PAGE: SWITCH BETWEEN CLASSIC AND ENHANCED TABLE
+// The buttons flip the same setting as the options page ("Restyle Game Odds Table").
+// ====================================================
+
+function setGameTableRestyle(on) {
+  if (!on) { hideGameHeaderMenu(); if (cnoGameColFilter) clearGameColFilter(); } // the filters are part of the enhanced table
+  if (typeof userSettings !== 'undefined') userSettings.modernizeGameTable = on;
+  try { chrome.storage.local.set({ modernizeGameTable: on }); } catch (e) { /* ignore */ }
+  const bar = document.getElementById('cno-gt-toolbar');
+  if (bar) bar.remove();
+  cnoRunGameTablePass();
+}
+
+// Put split cells back to the site's own text ("+326 ($59 @ 23.5¢)")
+function restoreSplitCells(table) {
+  table.querySelectorAll('td[data-lh-split]').forEach(td => {
+    const odds = td.querySelector('.lh-odds');
+    const sub = td.querySelector('.lh-sub');
+    if (odds && td.dataset.lhOrigText !== undefined) {
+      odds.parentNode.replaceChild(document.createTextNode(td.dataset.lhOrigText), odds);
+    }
+    if (sub) sub.remove();
+    delete td.dataset.lhSplit;
+    delete td.dataset.lhOrigText;
+  });
+  table.querySelectorAll('.lh-narrow, .lh-name, .lh-ref, .lh-ref-end').forEach(el =>
+    el.classList.remove('lh-narrow', 'lh-name', 'lh-ref', 'lh-ref-end'));
+}
+
+// Classic table: a small "Show enhanced table" button just above it
+function ensureEnhancedTableButton(table) {
+  const host = table.parentElement;
+  if (!host || !host.parentNode) return;
+  let btn = document.getElementById('cno-gt-enhanced-btn');
+  if (btn && btn.nextElementSibling === host) return;
+  if (btn) btn.remove();
+  btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'cno-gt-enhanced-btn';
+  btn.className = 'cno-gt-switch';
+  btn.textContent = '⚡ Show enhanced table';
+  btn.title = 'Turn the restyled table back on (same as "Restyle Game Odds Table" in the options)';
+  btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); btn.remove(); setGameTableRestyle(true); });
+  host.parentNode.insertBefore(btn, host);
+}
+// Liquidity columns are kept narrow so they don't soak up spare width, but when only a few books
+// are shown the regular book columns get wide and the liquidity ones looked squeezed next to them.
+// Make each liquidity column at least as wide as a regular book column (and never narrower than
+// its own contents). A few quick passes let the widths settle, since they affect each other.
+function balanceNarrowColumns(table, cols) {
+  const visible = (th) => th.offsetWidth > 0;
+  const narrow = cols.books.map(b => b.th).filter(th => th.classList.contains('lh-narrow') && visible(th));
+  const regular = cols.books.map(b => b.th).filter(th => !th.classList.contains('lh-narrow') && visible(th));
+  cols.books.forEach(b => { if (!b.th.classList.contains('lh-narrow') && b.th.style.width) b.th.style.width = ''; });
+  if (!narrow.length) return;
+
+  // Natural width: the CSS floor or the contents, whichever is wider
+  narrow.forEach(th => { th.style.width = ''; });
+  const natural = new Map(narrow.map(th => [th, th.offsetWidth]));
+  if (!regular.length) return;
+
+  for (let pass = 0; pass < 4; pass++) {
+    const avgRegular = regular.reduce((sum, th) => sum + th.offsetWidth, 0) / regular.length;
+    let changed = false;
+    narrow.forEach(th => {
+      const target = Math.round(Math.max(natural.get(th), avgRegular));
+      if (Math.abs(th.offsetWidth - target) > 1) {
+        th.style.width = `${target}px`;
+        changed = true;
+      }
+    });
+    if (!changed) break;
   }
 }

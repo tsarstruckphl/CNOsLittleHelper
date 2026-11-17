@@ -43,10 +43,25 @@ processUpdateBannerAlert(); // Added update banner check
   processEventFilterIcons();
   processCellFilterIcons();
   processSportsbookQrButtons();
+  processMainTableModern();
   processHedgeBookFilter();
   processInjuredRowExclusion();
+  processExcludePlayerUnders();
+  processMultiLeagueFilter();
+  processHiddenRowsNote();
   processUnusedExtraColumn();
+  processGameBookColumns();
+  processGameHeaderFilterMenus();
+  processGameColFilter();
+  processGameTableModern();
+  processGameRowOrdering();
+  processGameFocusRow();
+  processGameQrButtons();
+  processGameFilterLayout();
+  processPageHeaderLayout();
+  processGameHeaderWidths();
   processCalcButtons();
+  processBoostDefaultOnLoad();
   processBoostAutoFocus();
 }
 

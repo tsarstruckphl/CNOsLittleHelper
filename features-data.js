@@ -656,6 +656,12 @@ function processInjuryBadges() {
 
   if (injuryDataMap.size === 0) return;
 
+  // Game pages: one league for the whole page (from "Sport - League" at the top), names in the first column
+  if (window.location.pathname.toLowerCase().includes('game.aspx')) {
+    processGameInjuryBadges();
+    return;
+  }
+
   const headerBetIdxCache = new WeakMap();
   const getHeaderBetIdx = (row) => {
     const table = row.closest('table');
@@ -681,7 +687,7 @@ function processInjuryBadges() {
       const txt = cell.textContent.trim().toUpperCase();
       if (txt === 'WNBA') { league = 'WNBA'; break; }
       if (txt === 'NBA') { league = 'NBA'; break; }
-      if (txt === 'NFL' || txt === 'FOOTBALL' || txt === 'NCAAF') { league = 'NFL'; break; }
+      if (txt === 'NFL') { league = 'NFL'; break; } // NFL only: college players aren't on the injury lists
       if (txt === 'MLB') { league = 'MLB'; break; }
     }
 
@@ -1400,5 +1406,36 @@ function openMarketSearchModal(targetInput) {
     renderResults('');
     updateFooterPreview();
     setTimeout(() => searchInput.focus(), 50);
+  });
+}
+function processGameInjuryBadges() {
+  const labelEl = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_LabelSportLeague');
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!labelEl || !table) return;
+
+  // "Basketball - NBA" -> NBA (NBA, WNBA, NFL and MLB only, as on the tool pages)
+  const parts = labelEl.textContent.split('-').map(x => x.trim().toUpperCase());
+  const raw = parts[parts.length - 1] || '';
+  let league = '';
+  if (raw === 'WNBA') league = 'WNBA';
+  else if (raw === 'NBA') league = 'NBA';
+  else if (raw === 'NFL') league = 'NFL';
+  else if (raw === 'MLB') league = 'MLB';
+  if (!league) return;
+
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  let nameIdx = ths.findIndex(th => th.textContent.trim().toLowerCase() === 'bet name');
+  if (nameIdx === -1) nameIdx = 0;
+
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    if (row.children.length < 2 || row.querySelector('.cno-injury-badge')) return;
+    const cell = row.children[nameIdx];
+    if (!cell) return;
+    const clone = cell.cloneNode(true);
+    clone.querySelectorAll('[class^="cno-"], [class*=" cno-"]').forEach(el => el.remove());
+    const name = normalizePlayerName(clone.textContent.trim());
+    if (!name) return;
+    const info = injuryDataMap.get(`${league}|${name}`);
+    if (info) cell.insertAdjacentHTML('afterbegin', createInjuryBadge(info));
   });
 }

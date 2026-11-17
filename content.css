@@ -169,6 +169,9 @@ html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 inp
 /* ====================================================
    HEDGE SPORTSBOOK FILTER (rows hidden client-side)
    ==================================================== */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-game-hidden,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-league-hidden,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-under-hidden,
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-injured-hidden,
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-hedge-hidden {
   display: none !important;
@@ -210,4 +213,661 @@ a.cno-devigger-btn:active {
 /* Option: hide the unused "Extra" column */
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .cno-col-hidden {
   display: none !important;
+}
+
+/* ====================================================
+   GAME PAGE DROPDOWNS (Modernized UI on) – same look as the modern filter panel's dropdowns
+   ==================================================== */
+html.cno-modern-ui.cno-game-page #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView select {
+  box-sizing: border-box;
+  height: 34px;
+  padding: 4px 8px;
+  margin: 2px 4px 2px 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+html.cno-modern-ui.cno-game-page #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView select:hover {
+  border-color: #94a3b8;
+}
+
+html.cno-modern-ui.cno-game-page #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView select:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+/* Game page QR: float on the cell's top edge instead of covering the odds */
+.cno-hover-tray.cno-hover-tray-above {
+  top: 0;
+  right: 50%;
+  transform: translate(50%, -60%);
+  padding: 1px 2px;
+}
+
+/* ====================================================
+   GAME PAGE: COMPACT FILTER CARD (Modernized UI)
+   ==================================================== */
+html.cno-modern-ui.cno-game-page #cno-game-filter-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: none;
+  margin: 4px 0 6px 0;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 14px;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-help {
+  margin-left: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #0284c7;
+  text-decoration: none;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card select {
+  height: 32px;
+  margin: 0;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card select[id$="DropDownListMarket"] {
+  min-width: 280px;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-checks {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 32px;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-check {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #0284c7;
+  cursor: pointer;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-check label {
+  cursor: pointer;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-update {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+html.cno-modern-ui.cno-game-page #cno-game-filter-card .cno-gf-update input[type="submit"] {
+  margin-right: 0;
+}
+
+/* ====================================================
+   PAGE HEADERS (Modernized UI)
+   Tool pages: title + muted "Last Updated" in a light card with a blue accent bar.
+   Game pages: same card style, with Sport-League / Event / Start time in two lines.
+   ==================================================== */
+html.cno-modern-ui #cno-title-row,
+html.cno-modern-ui #cno-game-header {
+  box-sizing: border-box;
+  max-width: none;
+  margin: 6px 0 8px 0;
+  padding: 8px 14px;
+  border: 1px solid #e0f2fe;
+  border-left: 4px solid #0284c7;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 70%);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html.cno-modern-ui #cno-title-row {
+  margin: 2px 0 8px 0;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+html.cno-modern-ui #cno-title-row > h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+/* Last Updated + Refresh (muted, right side) */
+html.cno-modern-ui #cno-title-row #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo,
+html.cno-modern-ui #cno-game-header #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo br {
+  display: none;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo input[type="button"] {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelServerInfo input[type="button"]:hover:not([disabled]) {
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+/* Game page header */
+html.cno-modern-ui #cno-game-header {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-league {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-event {
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-date {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+html.cno-modern-ui #cno-game-header .cno-gh-date::before {
+  content: "\1F552  ";
+}
+
+/* ====================================================
+   GAME PAGE: MODERNIZED ODDS TABLE (Modernized UI)
+   ==================================================== */
+#cno-gt-toolbar > td.cno-gt-cell {
+  padding: 4px 0 6px 0 !important;
+  background: #ffffff !important;
+  border: none !important;
+  text-align: left !important;
+}
+
+#cno-gt-toolbar .cno-gt-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+#cno-gt-toolbar .cno-gt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #ffffff;
+  font: 600 0.78rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #334155;
+  cursor: pointer;
+}
+
+#cno-gt-toolbar .cno-gt-toggle:hover { border-color: #94a3b8; }
+
+#cno-gt-toolbar .cno-gt-toggle.is-on {
+  background: #e8f0fe;
+  border-color: #93b4f0;
+  color: #1e3a8a;
+}
+
+#cno-gt-toolbar .cno-gt-check {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #94a3b8;
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+#cno-gt-toolbar .cno-gt-toggle.is-on .cno-gt-check {
+  border-color: #2563eb;
+  background: #2563eb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-4.9' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 10px no-repeat;
+}
+
+#cno-gt-toolbar .cno-gt-liq {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+  color: #475569;
+}
+
+#cno-gt-toolbar .cno-gt-liq input {
+  width: 64px;
+  margin-left: 2px;
+  padding: 3px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font: 600 0.8rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+}
+
+/* Cells: centered, odds lined up along the top */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern td {
+  text-align: center;
+  vertical-align: top;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern th {
+  text-align: center;
+}
+
+/* Liquidity columns (PN, PX, NV, KI...): as narrow as their contents, with less side padding.
+   The table still fills the page width; the spare width goes to the other columns. */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern th.lh-narrow,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern td.lh-narrow {
+  /* A px width acts as a floor in auto table layout: wider content still grows the column,
+     but the table's spare width goes to the other columns instead of these */
+  width: 66px;
+  box-sizing: border-box; /* widths set by the extension are measured the same way (incl. padding) */
+  white-space: nowrap;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* Exchange cells: odds, then "$liquidity · price" small underneath */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-odds {
+  display: block;
+  line-height: 1.25;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.74em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #64748b;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-sub .lh-price {
+  color: #a3acb9;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-sub.lh-low .lh-liq {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* Bet Name: a quiet label column */
+/* Column tints are see-through layers on top of the row's own color (striping or pair band),
+   so pairs stay readable across the whole row */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern td.lh-name {
+  text-align: left;
+  font-weight: normal;
+  color: #111827;
+  background-image: linear-gradient(rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.04));
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern th.lh-name {
+  text-align: left;
+}
+
+/* Best / Fair Odds: a reference block, set apart from the books (cell highlights still show) */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern th.lh-ref {
+  background: linear-gradient(#1e3a8a, #284a9e) !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern td.lh-ref {
+  background-image: linear-gradient(rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0.06));
+}
+
+/* Cells the site colors (best / EV highlights) keep their exact color */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern td.lh-ref[style*="background-color"] {
+  background-image: none;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-modern .lh-ref-end {
+  border-right: 2px solid #94a3b8 !important;
+}
+
+/* Hide empty books */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-empty-hidden {
+  display: none !important;
+}
+
+/* Pair 2-/3-way lines: one band per line group, a divider after each group.
+   Kept low-specificity on purpose so the Bet Name / Best / Fair tints still win. */
+table.lh-paired tr.lh-band-a > td {
+  background-color: #ffffff;
+}
+
+table.lh-paired tr.lh-band-b > td {
+  background-color: #eff3fb;
+}
+
+table.lh-paired tr.lh-group-end > td {
+  border-bottom: 2px solid #b4c2db;
+}
+
+/* (Hiding the game odds table until it's restyled is done by a <style> that config.js adds.) */
+
+/* Classic / enhanced table switch (game pages) */
+.cno-gt-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #ffffff;
+  font: 600 0.78rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0369a1;
+  cursor: pointer;
+}
+
+.cno-gt-switch:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+#cno-gt-toolbar .cno-gt-switch {
+  margin-left: auto;
+}
+
+/* Classic table: the "Show enhanced table" button on its own line, at the right (like "Show classic table") */
+#cno-gt-enhanced-btn {
+  display: flex;
+  width: max-content;
+  margin: 0 0 6px auto;
+}
+
+/* ====================================================
+   RESULTS TABLES (tool pages): "Restyle Results Tables"
+   ==================================================== */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > thead > tr > th {
+  vertical-align: bottom;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > tbody > tr > td {
+  vertical-align: top;
+}
+
+/* Prices: centered odds over a small liquidity/price line. The column is kept to its contents,
+   so a long header ("Promo Bet Odds", "Hedge Bet Odds") wraps to two lines. */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th.lh-price {
+  width: 1%;
+  white-space: normal;
+  text-align: center;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-price {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The metric (EV% / HV% / ROI% ...): stronger, roomy, middle-aligned */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > tbody > tr > td.lh-metric {
+  vertical-align: middle;
+  min-width: 72px;
+  color: #0f172a;
+  font-size: 1.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Books / EV Hit%: a little quieter, still easy to read */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-muted {
+  color: #475569;
+}
+
+/* Date: the day, then the time smaller underneath */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-date {
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-day {
+  display: block;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .lh-time {
+  display: block;
+  font-size: 0.82em;
+  color: #64748b;
+}
+
+/* "FV Devig" under the Calc button, on hover */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.lh-calc.lh-has-fv {
+  position: relative;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 .cno-fv-pop {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.lh-calc.lh-has-fv:hover .cno-fv-pop {
+  display: flex;
+}
+
+
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link {
+  display: block;
+  padding: 2px 6px 3px;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  font: 600 0.68rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.3;
+  color: #075985 !important;
+  text-align: center;
+  text-decoration: none !important;
+  white-space: nowrap;
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.12);
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:first-child {
+  border-radius: 5px 5px 0 0;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:last-child {
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link + a.cno-fv-link {
+  border-top: 1px solid #bae6fd;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:hover {
+  background: #bae6fd;
+  color: #0c4a6e !important;
+}
+
+/* Sport folded into League: the Sport column is hidden and shown as a small line above the League */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league .lh-sport-col {
+  display: none !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league td.lh-league {
+  white-space: nowrap;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league td.lh-league::before {
+  content: attr(data-lh-sport);
+  display: block;
+  font-size: 0.68em;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+/* ---- Results tables: tighter rows, everything middle-aligned ----
+   The liquidity line under an exchange's odds is taken out of the flow and hung just below the
+   odds, so the odds sit on the same middle line as every other cell in the row. */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > tbody > tr > td {
+  vertical-align: middle;
+  padding-top: var(--lh-row-pad, 7px);
+  padding-bottom: var(--lh-row-pad, 7px);
+  line-height: 1.3;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > tbody > tr > td.lh-price {
+  position: relative;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main > tbody > tr > td.lh-price.lh-has-sub {
+  padding-top: calc(var(--lh-row-pad, 7px) + 9px);
+  padding-bottom: calc(var(--lh-row-pad, 7px) + 9px);
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-price .lh-sub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + 0.62em);
+  margin: 0;
+  text-align: center;
+}
+
+/* League (with the sport above it): only as wide as it needs, the two lines close together */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league td.lh-league,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league th.lh-league {
+  width: 1%;
+  min-width: 78px; /* short leagues (NFL, NCAAF) still get a comfortable column */
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league td.lh-league {
+  line-height: 1.2;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main.lh-has-league td.lh-league::before {
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-date {
+  line-height: 1.2;
+}
+
+/* Results tables: bet names and their odds (incl. hedge) a touch darker, not bold */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-betname,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-price .lh-odds,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-price:not(.lh-has-sub) {
+  color: #0b1220;
+}
+
+/* Price headers: wide enough that "Promo Bet Odds" / "Hedge Bet Odds" wrap to at most two lines */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th.lh-price,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-price {
+  min-width: 78px;
+}
+
+/* Fair Odds: wide enough that its header usually stays on one line */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th.lh-fair {
+  min-width: 92px;
 }

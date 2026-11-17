@@ -1,3 +1,19 @@
+1.2.2
+FEATURE ADDITIONS:
+--Results tables restyle (option, on by default; "Show classic table" to switch back): narrower odds columns with liquidity/price under the odds, compact date and sport/league, "FV Devig" link under the Calc button on hover (replaces right-click), and a Row spacing setting
+--Odds Boost: "Set as default | Clear" for the boost amount
+--Clear Filters now resets fields to your CNO Settings page defaults (devig method, profit strategy, sort by, minimum +EV %, liquidity, market sides, complete sportsbook, minimum books, mainlines) instead of blanks; Save/Apply Filter now include all of these fields too (saved only when they differ from your defaults)
+--Game pages: modernized odds table (narrower exchange columns with liquidity/price shown underneath, liquidity highlight threshold, "Hide empty books" and "Pair 2-/3-way lines" toggles, Best/Fair Odds set apart)
+--Game pages: hover a book's column header to refine to that book's non-blank lines, Best Odds, >= FV, or either (paired lines stay together)
+--Game pages: QR code button on odds cells when Deeplinks is on
+--Game pages: dropdowns match the modernized UI (when Modernized UI is on)
+--Game pages: Option to hide unwanted books from game odds tables, with a "Specify shown books" list on the options page
+--"Refine: Hedge Books" on all pages with a hedge/low hold sportsbook (pick several hedge books to keep)
+--"Refine: Leagues" in Market Parameters (pick several leagues to keep when League is All)
+--Note above the table showing how many rows are hidden by Exclude/Refine options and why
+--"Exclude Player Unders" option in Market Parameters (hides player-prop Under and "No" rows; remembered per page)
+--Verbose bet description added to Click to Open Devigger
+
 1.2.1
 FEATURE ADDITIONS:
 --QR code button on Sportsbook cells (including Hedge Bet Sportsbook) to open the bet link on your phone

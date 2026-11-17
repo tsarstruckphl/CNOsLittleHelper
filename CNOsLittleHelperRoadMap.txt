@@ -4,14 +4,17 @@ Planned Improvements
 (+) Ability to backup and import settings/saved filters 
 (+) Ability to switch default devigger to hedgecalc instead of CNO
 (+) MLB weather filter 
-(+) Ability to remove books from game odd pages (by default removing the inactive ones like ST, FDYW, etc.)
+(+) Ability to export and import CNO settings (not extension settings)
+(+) Ability to multi-select bets to send to devigger, create multi-bet QR codes, and 
+(+) Branched Firefox version?
+(+) Game Odds: Injury badges on players
 
-Bugs to fix: 
---tabbing between items in "classic"  view is broken
 
 Possible Improvements
 ---------------------
 
 (-) Ability to add a profit boost to Positive EV's Calc Box
 (-) NFL weather icons
-(-) Ability to export and import CNO settings (not extension settings)
+(-) Game odds page: custom sharp book FV (note to self: think about minimum 
+(-) Game odds page: sorting by EV % (and custom sharp book EV%?)
+(-) Modernized main tables

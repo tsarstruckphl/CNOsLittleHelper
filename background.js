@@ -1,3 +1,9 @@
+// The Firefox build (made by build-firefox.ps1) has a "browser_specific_settings" section in its
+// manifest. Firefox gets updates from addons.mozilla.org, so the GitHub update check is off there.
+const CNO_IS_FIREFOX_BUILD = !!(chrome.runtime.getManifest().browser_specific_settings);
+const CNO_UPDATE_CHECKS_ENABLED = !CNO_IS_FIREFOX_BUILD;
+const UPGRADE_MENU_ID = 'cno-upgrade-menu';
+
 const GITHUB_RELEASE_API = 'https://api.github.com/repos/tsarstruckphl/CNOsLittleHelper/releases/latest';
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const UPDATE_ALARM_NAME = 'cno-update-check';
@@ -10,27 +16,40 @@ function ensureUpdateAlarm() {
   });
 }
 
-chrome.runtime.onStartup.addListener(() => {
-  ensureUpdateAlarm();
-  checkLatestRelease();
-});
+if (CNO_UPDATE_CHECKS_ENABLED) {
+  chrome.runtime.onStartup.addListener(() => {
+    ensureUpdateAlarm();
+    checkLatestRelease();
+  });
 
-chrome.runtime.onInstalled.addListener(() => {
-  ensureUpdateAlarm();
-  checkLatestRelease();
-});
+  chrome.runtime.onInstalled.addListener(() => {
+    ensureUpdateAlarm();
+    checkLatestRelease();
+  });
 
-// Re-check every 24 hours regardless of whether the browser was restarted.
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === UPDATE_ALARM_NAME) {
-    checkLatestRelease(true);
-  }
-});
+  // Re-check every 24 hours regardless of whether the browser was restarted.
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === UPDATE_ALARM_NAME) {
+      checkLatestRelease(true);
+    }
+  });
+
+  chrome.contextMenus.onClicked.addListener((info) => {
+    if (info.menuItemId === UPGRADE_MENU_ID) {
+      // Jump straight to the version / update section of the options page
+      chrome.tabs.create({ url: chrome.runtime.getURL('options.html') + '#cno-version-card' });
+    }
+  });
+}
 
 // Allows the extension's own pages (e.g. the options page) to request a fresh check.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'cno-check-update' && sender.id === chrome.runtime.id &&
       sender.url && sender.url.startsWith(chrome.runtime.getURL(''))) {
+    if (!CNO_UPDATE_CHECKS_ENABLED) {
+      sendResponse({ ok: false, disabled: true, currentVersion: chrome.runtime.getManifest().version });
+      return;
+    }
     checkLatestRelease(true).then(sendResponse);
     return true; // keep the channel open for the async response
   }
@@ -118,7 +137,6 @@ function isVersionHigher(latest, current) {
   return false;
 }
 
-const UPGRADE_MENU_ID = 'cno-upgrade-menu';
 
 // Adds/removes "Upgrade to new version" in the toolbar icon's right-click menu
 function setUpgradeMenu(hasUpdate) {
@@ -136,12 +154,6 @@ function setUpgradeMenu(hasUpdate) {
   });
 }
 
-chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === UPGRADE_MENU_ID) {
-    // Jump straight to the version / update section of the options page
-    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') + '#cno-version-card' });
-  }
-});
 
 function setBadgeState(hasUpdate) {
   setUpgradeMenu(hasUpdate);

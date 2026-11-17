@@ -50,6 +50,34 @@
       padding-top: 16px;
       margin-bottom: 20px;
     }
+    .setting-sub {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+    .setting-sub select {
+      font-size: 0.8rem;
+      padding: 3px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      background: #ffffff;
+      color: #0f172a;
+    }
+    .setting-sub select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .setting-group-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #0284c7;
+      margin-bottom: -4px;
+    }
     .setting-item {
       display: flex;
       align-items: flex-start;
@@ -57,7 +85,10 @@
       cursor: pointer;
     }
     .setting-item input[type="checkbox"] {
+      /* Fixed size: in a flex row, settings with long descriptions were squeezing their checkbox */
+      flex: 0 0 18px;
       width: 18px;
+      min-width: 18px;
       height: 18px;
       accent-color: #0284c7;
       cursor: pointer;
@@ -156,12 +187,28 @@
       background-color: #0369a1;
       transform: translateY(-1px);
     }
+    /* "Settings saved!" toast: pinned to the bottom of the window so it's seen wherever you are */
     #status {
-      margin-top: 12px;
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      z-index: 100000;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #065f46;
+      color: #ffffff;
       font-size: 0.85rem;
-      color: #10b981;
       font-weight: 600;
-      min-height: 1.2em;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.15s ease;
+    }
+    #status:empty {
+      opacity: 0;
+      padding: 0;
+      box-shadow: none;
     }
     /* Modal Styles */
     .cno-modal {
@@ -228,43 +275,12 @@
     <p class="subtitle">Customize which dynamic enhancements run on CrazyNinjaOdds pages.</p>
 
     <div class="setting-group">
+      <div class="setting-group-title">Layout &amp; Appearance</div>
       <label class="setting-item">
         <input type="checkbox" id="enableFilterModernization">
         <div class="setting-label">
           <span class="setting-title">Modernized Filter Panel UI</span>
           <span class="setting-desc">Restyles filter controls into clean cards with OR sport/league dividers and market search.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="enablePctBadges">
-        <div class="setting-label">
-          <span class="setting-title">Odds-to-Percentage Badges</span>
-          <span class="setting-desc">Shows probability % badges next to American odds in the calculator popups for exchange sportsbooks (Novig, Kalshi, ProphetX).</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="enableInjuryBadges">
-        <div class="setting-label">
-          <span class="setting-title">Injury Guard Badges</span>
-          <span class="setting-desc">Displays player injury statuses (Out, Questionable, GTD, IL) directly on player prop markets.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="enableMlbWeather">
-        <div class="setting-label">
-          <span class="setting-title">MLB Weather Badges</span>
-          <span class="setting-desc">Displays rain/delay icons on MLB games matching Rotowire's forecasts.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="enableApRankings">
-        <div class="setting-label">
-          <span class="setting-title">NCAA AP Top 25 Rankings</span>
-          <span class="setting-desc">Annotates NCAAF and NCAAB team names with current AP rankings.</span>
         </div>
       </label>
 
@@ -291,8 +307,76 @@
           <span class="setting-desc">Hides the Extra column in the results table when none of the rows have anything in it.</span>
         </div>
       </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="modernizeMainTables">
+        <div class="setting-label">
+          <span class="setting-title">Restyle Results Tables</span>
+          <span class="setting-desc">On the tool pages (Positive EV, Odds Boost, Low Hold, etc.): narrower odds columns (liquidity and price shown under the odds), compact date and sport/league, and an "FV Devig" link under the Calc button. Turn off to use CNO's normal tables.</span>
+          <span class="setting-sub">
+            <label for="mainTableDensity">Row spacing</label>
+            <select id="mainTableDensity">
+              <option value="compact">Compact: most rows on screen</option>
+              <option value="standard">Standard</option>
+              <option value="spacious">Spacious: easiest to read</option>
+            </select>
+          </span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="modernizeGameTable">
+        <div class="setting-label">
+          <span class="setting-title">Restyle Game Odds Table</span>
+          <span class="setting-desc">On game pages: narrower exchange columns (liquidity and price shown under the odds), centered odds, Best/Fair Odds set apart, plus "Hide empty books", "Pair 2-/3-way lines" and a liquidity highlight above the table.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideUnwantedGameBooks">
+        <div class="setting-label">
+          <span class="setting-title">Hide unwanted books from game odds tables</span>
+          <span class="setting-desc">Removes the columns for books you've unchecked from the odds table on game pages. <a id="specifyShownBooks" href="#" style="color:#0284c7; font-weight:600; text-decoration:none;">Specify shown books</a></span>
+        </div>
+      </label>
     </div>
 
+    <div class="setting-group">
+      <div class="setting-group-title">Player, Team, &amp; Odds Info</div>
+      <label class="setting-item">
+        <input type="checkbox" id="enableInjuryBadges">
+        <div class="setting-label">
+          <span class="setting-title">Injury Guard Badges</span>
+          <span class="setting-desc">Displays player injury statuses (Out, Questionable, GTD, IL) directly on player prop markets.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="enableMlbWeather">
+        <div class="setting-label">
+          <span class="setting-title">MLB Weather Badges</span>
+          <span class="setting-desc">Displays rain/delay icons on MLB games matching Rotowire's forecasts.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="enableApRankings">
+        <div class="setting-label">
+          <span class="setting-title">NCAA AP Top 25 Rankings</span>
+          <span class="setting-desc">Annotates NCAAF and NCAAB team names with current AP rankings.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="enablePctBadges">
+        <div class="setting-label">
+          <span class="setting-title">Odds-to-Percentage Badges</span>
+          <span class="setting-desc">Shows probability % badges next to American odds in the calculator popups for exchange sportsbooks (Novig, Kalshi, ProphetX).</span>
+        </div>
+      </label>
+    </div>
+
+    <script src="config.js"></script>
     <div class="footer-links">
       <div class="footer-links-row">
         <a id="viewChangeLog">View Change Log</a>

@@ -181,6 +181,7 @@ function updateTop25CheckboxState(container = document) {
 // ----------------------------------------------------
 
 function prepareAndExecuteUpdate(container = document) {
+  applyLowHoldHedgeBookPickerOnUpdate();
   const elBetContains = document.querySelector('[id$="TextBoxBetNameContains"]');
   const elInjuredOnlyCb = document.querySelector('#cno-injured-only-cb');
 
@@ -410,7 +411,7 @@ function updateExcludeInjuredCheckboxState(container = document) {
     'Select MLB, NBA, NFL, or WNBA from League to enable');
 }
 
-function updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookWrapper, hedgeMainWrapper, sortByWrapper = null) {
+function updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookWrapper, hedgeMainWrapper, sortByWrapper = null, hedgePickerWrapper = null) {
   if (!elProfitStrategy) return;
 
   const update = () => {
@@ -426,6 +427,9 @@ function updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookWrapper, 
     }
     if (sortByWrapper) {
       sortByWrapper.style.display = isHedge ? 'flex' : 'none';
+    }
+    if (hedgePickerWrapper) {
+      hedgePickerWrapper.style.display = isHedge ? '' : 'none';
     }
   };
 
@@ -483,6 +487,13 @@ function buildCrossToolUrl(targetPage, scopeContainer = document) {
   if (elMaxResults && elMaxResults.value.trim()) params.set('result_max', elMaxResults.value.trim());
 
   const destKey = (targetPage.match(/\/([a-z0-9-]+)\.aspx/i) || [])[1] || 'positive-ev';
+
+  // Hedge Sportsbook Filter selection (only when it's narrowed down)
+  const hedgeSel = getHedgeBookPickerSelection();
+  if (hedgeSel && ['low-hold', 'odds-boost', 'free-bet-converter', 'risk-free-bet', 'bet-and-get', 'win-and-get'].includes(destKey)) {
+    params.set('cno_hedge_books', hedgeSel.join('|'));
+  }
+
   const hasBoost = destKey === 'odds-boost';
   const hasReward = ['risk-free-bet', 'win-and-get', 'bet-and-get'].includes(destKey);
 
@@ -491,8 +502,12 @@ function buildCrossToolUrl(targetPage, scopeContainer = document) {
     const boostTypeEl = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
     if (boostTypeEl && boostTypeEl.value) params.set('boost_type', boostTypeEl.value.trim());
 
-    const pctEl = getEl('TextBoxBoostPercentage') || (document.getElementById('spanBoostPercentage') || document).querySelector('input[type="text"]');
-    const oddsEl = getEl('TextBoxBoostOdds') || (document.getElementById('spanBoostOdds') || document).querySelector('input[type="text"]');
+    // Only read real boost boxes. (The old fallback searched the whole page when there was no boost
+    // box, e.g. on Positive EV, and picked up the first text box: Minimum Odds.)
+    const spanPctEl = document.getElementById('spanBoostPercentage');
+    const spanOddsEl = document.getElementById('spanBoostOdds');
+    const pctEl = getEl('TextBoxBoostPercentage') || (spanPctEl ? spanPctEl.querySelector('input[type="text"]') : null);
+    const oddsEl = getEl('TextBoxBoostOdds') || (spanOddsEl ? spanOddsEl.querySelector('input[type="text"]') : null);
     if (pctEl && pctEl.value && pctEl.value.trim()) params.set('boost_pct', pctEl.value.trim());
     if (oddsEl && oddsEl.value && oddsEl.value.trim()) params.set('boost_odds', oddsEl.value.trim());
 
@@ -639,6 +654,12 @@ function clearAllPageFilters(container = document) {
     elInjuredOnlyCb.checked = false;
   }
 
+  // Low Hold hedge sportsbook picker: back to all books (takes effect on the next Update, like the other fields)
+  syncLowHoldHedgeBookPicker(null);
+
+  // Multi-league filter: back to all leagues
+  setMultiLeagueSelection(null);
+
   const elTop25Cb = container.querySelector('#cno-top25-cb') || document.querySelector('#cno-top25-cb');
   if (elTop25Cb) {
     elTop25Cb.checked = false;
@@ -710,6 +731,11 @@ function clearAllPageFilters(container = document) {
 
   updateExcludeInjuredCheckboxState(container);
   updateTop25CheckboxState(container);
+
+  // Then fill in the defaults the user saved on CNO's Settings page (Defaults section)
+  applySiteDefaults(container);
+  // ...and the user's default boost amount (Odds Boost page)
+  if (isOddsBoostPage) applyBoostDefault(true);
 }
 
 function setupFilterToggle() {
@@ -1133,6 +1159,7 @@ function createBetNameWithExcludeInjuredField(labelText, inputEl, isImportant = 
       };
 
       const exclude = makeCb('cno-exclude-injured-cb', 'Exclude');
+      exclude.lbl.appendChild(createRowsFilterHint());
       const injuredOnly = makeCb('cno-injured-only-cb', 'Injured Only');
 
       // The two are opposites, so checking one unchecks the other
@@ -1623,6 +1650,8 @@ function restyleFilterPanel() {
     }
 
     cardArb1.appendChild(inlineArbCheckRow);
+    cardArb1.appendChild(createExcludePlayerUndersRow());
+    cardArb1.appendChild(createMultiLeagueRow());
 
     const cardArb2 = document.createElement('div');
     cardArb2.className = 'cno-card';
@@ -1735,6 +1764,8 @@ function restyleFilterPanel() {
     }
 
     cardLH3.appendChild(inlineCheckRow);
+    cardLH3.appendChild(createExcludePlayerUndersRow());
+    cardLH3.appendChild(createMultiLeagueRow());
 
     const cardLH4 = document.createElement('div');
     cardLH4.className = 'cno-card';
@@ -1761,6 +1792,9 @@ function restyleFilterPanel() {
       hedgeMainLabel.prepend(elHedgeBookIsMain);
       cardLH4.appendChild(hedgeMainLabel);
     }
+
+    const hedgePicker = createLowHoldHedgeBookPicker(elSportsbook);
+    if (hedgePicker) cardLH4.appendChild(hedgePicker);
 
     gridLowHold.appendChild(cardLH1);
     gridLowHold.appendChild(cardLH2);
@@ -1898,6 +1932,8 @@ function restyleFilterPanel() {
     }
 
     cardFB3.appendChild(inlineCheckRow);
+    cardFB3.appendChild(createExcludePlayerUndersRow());
+    cardFB3.appendChild(createMultiLeagueRow());
 
     const cardFB4 = document.createElement('div');
     cardFB4.className = 'cno-card cno-card-devig-condensed';
@@ -1939,7 +1975,10 @@ function restyleFilterPanel() {
       }
     }
 
-    updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, hedgeMainLabel, sortByWrapper);
+    const hedgePickerFB = createLowHoldHedgeBookPicker(elSportsbook);
+    if (hedgePickerFB) cardFB4.appendChild(hedgePickerFB);
+
+    updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, hedgeMainLabel, sortByWrapper, hedgePickerFB);
 
     gridFB.appendChild(cardFB1);
     gridFB.appendChild(cardFB2);
@@ -2119,6 +2158,8 @@ function restyleFilterPanel() {
     }
 
     cardRFB3.appendChild(inlineCheckRow);
+    cardRFB3.appendChild(createExcludePlayerUndersRow());
+    cardRFB3.appendChild(createMultiLeagueRow());
 
     const cardRFB4 = document.createElement('div');
     cardRFB4.className = 'cno-card cno-card-devig-condensed';
@@ -2162,7 +2203,10 @@ function restyleFilterPanel() {
       }
     }
 
-    updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, hedgeMainLabel);
+    const hedgePickerRFB = createLowHoldHedgeBookPicker(elSportsbook);
+    if (hedgePickerRFB) cardRFB4.appendChild(hedgePickerRFB);
+
+    updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, hedgeMainLabel, null, hedgePickerRFB);
 
     if (elMaxResults) cardRFB4.appendChild(wrapField('Result Count', elMaxResults));
 
@@ -2218,6 +2262,7 @@ function restyleFilterPanel() {
 
     const boostAmtLabel = document.createElement('label');
     boostAmtLabel.textContent = 'Boost Amount';
+    boostAmtLabel.appendChild(createBoostDefaultLinks());
     boostAmountContainer.appendChild(boostAmtLabel);
 
     const boostInputsWrap = document.createElement('div');
@@ -2307,6 +2352,8 @@ function restyleFilterPanel() {
   }
 
   card3.appendChild(inlineCheckRow);
+  card3.appendChild(createExcludePlayerUndersRow());
+  card3.appendChild(createMultiLeagueRow());
 
   const card4 = document.createElement('div');
   card4.className = 'cno-card cno-card-devig-condensed';
@@ -2338,7 +2385,13 @@ function restyleFilterPanel() {
     card4.appendChild(sameBookLabel);
   }
 
-  updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, null);
+  let hedgePickerDefault = null;
+  if (elProfitStrategy && currentPath.includes('odds-boost.aspx')) {
+    hedgePickerDefault = createLowHoldHedgeBookPicker(elSportsbook);
+    if (hedgePickerDefault) card4.appendChild(hedgePickerDefault);
+  }
+
+  updateProfitStrategyHedgeVisibility(elProfitStrategy, sameBookLabel, null, null, hedgePickerDefault);
 
   const devigRow1 = document.createElement('div');
   devigRow1.className = 'cno-row-2col';
@@ -2447,7 +2500,7 @@ function collectFilterSelections(container = document) {
   const getEl = (suffix) => container.querySelector(`[id$="${suffix}"]`) || document.querySelector(`[id$="${suffix}"]`);
   const sel = { selects: {}, texts: {}, checks: {}, radios: {}, boost: {} };
 
-  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague'].forEach(suffix => {
+  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague', 'DropDownListProfitStrategy', 'DropDownListDevigMethod', 'DropDownListSortBy'].forEach(suffix => {
     const el = getEl(suffix);
     if (el && el.selectedIndex >= 0) {
       const opt = el.options[el.selectedIndex];
@@ -2459,7 +2512,8 @@ function collectFilterSelections(container = document) {
     'TextBoxMinimumOdds', 'TextBoxMaximumOdds', 'TextBoxEventNameContains', 'TextBoxMaximumDateHours',
     'TextBoxMarketNameContains', 'TextBoxBetNameContains', 'TextBoxMinimumBetPoints', 'TextBoxMaximumBetPoints',
     'TextBoxReward', 'TextBoxFreeCreditConversionRate', 'TextBoxMinimumLiquidity',
-    'TextBoxMinimumOddsProviderCount' // Minimum Books
+    'TextBoxMinimumOddsProviderCount', // Minimum Books
+    'TextBoxMinimumEVPercentage', 'TextBoxMinimumSubMarketSideCount', 'TextBoxMaximumSubMarketSideCount'
   ].forEach(suffix => {
     const el = getEl(suffix);
     if (el) sel.texts[suffix] = el.value;
@@ -2485,8 +2539,17 @@ function collectFilterSelections(container = document) {
   if (elIsMainSave) sel.checks.main = elIsMainSave.checked;
   const elHedgeMainSave = getEl('CheckBoxHedgeBook_IsMain');
   if (elHedgeMainSave) sel.checks.hedgeMain = elHedgeMainSave.checked;
+  const elReqCompleteSave = getEl('CheckBoxRequireACompleteSportsbook');
+  if (elReqCompleteSave) sel.checks.requireComplete = elReqCompleteSave.checked;
   if (excludeCb) sel.checks.excludeInjured = excludeCb.checked;
   if (injuredOnlyCb) sel.checks.injuredOnly = injuredOnlyCb.checked;
+  const playerUndersCb = document.querySelector('#cno-exclude-player-unders-cb');
+  if (playerUndersCb) sel.checks.excludePlayerUnders = playerUndersCb.checked;
+  if (document.getElementById('cno-multi-league')) sel.multiLeague = cnoMultiLeagueSelection ? cnoMultiLeagueSelection.slice() : 'all';
+
+  // Hedge Sportsbook Filter: 'all' or the list of selected books
+  const hedgeSel = getHedgeBookPickerSelection();
+  if (hedgeSel !== undefined) sel.hedgeBooks = hedgeSel ? hedgeSel : 'all';
   if (top25Cb) sel.checks.top25 = top25Cb.checked;
 
   const readRadio = (tableEl) => {
@@ -2533,7 +2596,17 @@ function setRadioFromSaved(tableEl, saved) {
   return true;
 }
 
+// Saved filters made since "only save what differs from the defaults" carry omitsDefaults;
+// their missing default fields are filled from the user's CNO defaults before applying.
 function applyFilterSelections(container, sel) {
+  if (sel && sel.omitsDefaults) {
+    getSiteDefaults((defaults) => applyFilterSelectionsNow(container, defaults ? fillDefaultSelections(sel, defaults) : sel));
+    return;
+  }
+  applyFilterSelectionsNow(container, sel);
+}
+
+function applyFilterSelectionsNow(container, sel) {
   const getEl = (suffix) => container.querySelector(`[id$="${suffix}"]`) || document.querySelector(`[id$="${suffix}"]`);
   const failures = [];
 
@@ -2547,10 +2620,14 @@ function applyFilterSelections(container, sel) {
     DropDownListSportsbookSite_All: 'Sportsbook',
     DropDownListSportsbookSite_NonDFS: 'Sportsbook',
     DropDownListSport: 'Sport',
-    DropDownListLeague: 'League'
+    DropDownListLeague: 'League',
+    DropDownListProfitStrategy: 'Profit Strategy',
+    DropDownListDevigMethod: 'Devig Method',
+    DropDownListSortBy: 'Sort By'
   };
-  // Sportsbook first, then Sport, then League (sport/league are mutually exclusive)
-  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague'].forEach(suffix => {
+  // Sportsbook first, then Sport, then League (sport/league are mutually exclusive), then Profit Strategy
+  // (its change event shows/hides the hedge-only options). Pages without a field just skip it.
+  ['DropDownListSportsbookSite_All', 'DropDownListSportsbookSite_NonDFS', 'DropDownListSport', 'DropDownListLeague', 'DropDownListProfitStrategy', 'DropDownListDevigMethod', 'DropDownListSortBy'].forEach(suffix => {
     if (!selects[suffix]) return;
     let el = getEl(suffix);
     if (!el && suffix.indexOf('DropDownListSportsbookSite_') === 0) {
@@ -2579,6 +2656,12 @@ function applyFilterSelections(container, sel) {
   const elLive = getEl('CheckBoxIsLive');
   if (elLive && checks.live !== undefined) elLive.checked = !!checks.live;
 
+  const elReqCompleteApply = getEl('CheckBoxRequireACompleteSportsbook');
+  if (elReqCompleteApply && checks.requireComplete !== undefined && elReqCompleteApply.checked !== !!checks.requireComplete) {
+    elReqCompleteApply.checked = !!checks.requireComplete;
+    elReqCompleteApply.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   // Mainlines first: the hedge-book box is disabled whenever Mainlines Only is off
   const elIsMainApply = getEl('CheckBoxIsMain');
   if (elIsMainApply && checks.main !== undefined) {
@@ -2596,6 +2679,11 @@ function applyFilterSelections(container, sel) {
   }
 
   const excludeCb = document.querySelector('#cno-exclude-injured-cb');
+  // A saved filter that doesn't mention the injury filter turns both boxes off
+  if (excludeCb && checks.excludeInjured === undefined && excludeCb.checked) {
+    excludeCb.checked = false;
+    if (typeof processInjuredRowExclusion === 'function') processInjuredRowExclusion();
+  }
   if (excludeCb && checks.excludeInjured !== undefined) {
     if (checks.excludeInjured && excludeCb.disabled) {
       failures.push('Injury Filter: Exclude (league not eligible)');
@@ -2605,7 +2693,24 @@ function applyFilterSelections(container, sel) {
     }
   }
 
+  const playerUndersCbApply = document.querySelector('#cno-exclude-player-unders-cb');
+  if (playerUndersCbApply && checks.excludePlayerUnders !== undefined) {
+    playerUndersCbApply.checked = !!checks.excludePlayerUnders;
+    // Same as clicking it: remember the choice for this page and hide/show rows
+    playerUndersCbApply.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // Multi-league filter: the saved leagues, or all leagues when the filter doesn't mention it
+  if (document.getElementById('cno-multi-league')) {
+    setMultiLeagueSelection(Array.isArray(sel.multiLeague) ? sel.multiLeague : null);
+  }
+
+  if (sel.hedgeBooks !== undefined && getLowHoldHedgeBookPicker()) {
+    syncLowHoldHedgeBookPicker(Array.isArray(sel.hedgeBooks) ? sel.hedgeBooks : null);
+  }
+
   const injuredOnlyCb = document.querySelector('#cno-injured-only-cb');
+  if (injuredOnlyCb && checks.injuredOnly === undefined) injuredOnlyCb.checked = false;
   if (injuredOnlyCb && checks.injuredOnly !== undefined) {
     if (checks.injuredOnly && injuredOnlyCb.disabled) {
       failures.push('Injury Filter: Injured Only (league not eligible)');
@@ -2937,14 +3042,20 @@ function openSaveFilterModal(container) {
 
       const commit = (keyName) => {
         const prev = page[keyName] || {};
-        page[keyName] = { savedAt: Date.now(), selections: collectFilterSelections(container) };
-        // Overwriting a filter keeps its usage history (for the Apply Filters hover menu)
-        if (prev.useCount) page[keyName].useCount = prev.useCount;
-        if (prev.lastUsed) page[keyName].lastUsed = prev.lastUsed;
-        all[pageKey] = page;
-        writeSavedFilters(all, () => {
-          close();
-          showSavedFilterToast(`Saved "${keyName}"`);
+        const selections = collectFilterSelections(container);
+        // Fields that match the user's CNO defaults aren't stored (they're filled from the
+        // defaults when the filter is applied), so saved filters only carry what's different
+        getSiteDefaults((defaults) => {
+          if (defaults) stripDefaultSelections(selections, defaults);
+          page[keyName] = { savedAt: Date.now(), selections };
+          // Overwriting a filter keeps its usage history (for the Apply Filters hover menu)
+          if (prev.useCount) page[keyName].useCount = prev.useCount;
+          if (prev.lastUsed) page[keyName].lastUsed = prev.lastUsed;
+          all[pageKey] = page;
+          writeSavedFilters(all, () => {
+            close();
+            showSavedFilterToast(`Saved "${keyName}"`);
+          });
         });
       };
 
@@ -3509,8 +3620,12 @@ function cnoShowUpdateHint(btn, text = null) {
 }
 
 function cnoUpdateButtonFromEvent(e) {
-  const el = e.target && e.target.closest ? e.target.closest('input[type="submit"]') : null;
+  if (!e.target || !e.target.closest) return null;
+  const el = e.target.closest('input[type="submit"]');
   if (el && el.id && el.id.endsWith(CNO_UPDATE_BUTTON_ID_SUFFIX)) return el;
+  // The "Refresh" button next to "Last Updated" just clicks Update, so it gets the same shortcut hint
+  const refresh = e.target.closest('input#ButtonRefresh');
+  if (refresh) return refresh;
   return null;
 }
 
@@ -3702,12 +3817,12 @@ function applySportsbookFilter(bookName) {
   triggerFilterUpdate(getFilterAccordionContainer() || document);
 }
 
-function createHoverFilterBtn(title, onClick) {
+function createHoverFilterBtn(title, onClick, iconSvg = EVENT_FILTER_ICON_SVG) {
   const btn = document.createElement('span');
   btn.className = 'cno-cell-filter-btn cno-hover-filter-btn';
   btn.setAttribute('role', 'button');
   btn.title = title;
-  btn.innerHTML = EVENT_FILTER_ICON_SVG;
+  btn.innerHTML = iconSvg;
   btn.style.cssText = 'display:inline-flex; align-items:center; vertical-align:middle; margin-left:5px; padding:4px; color:#0284c7; cursor:pointer; border-radius:4px;';
   btn.addEventListener('mouseover', () => { btn.style.background = '#e0f2fe'; });
   btn.addEventListener('mouseout', () => { btn.style.background = 'none'; });
@@ -3775,9 +3890,9 @@ function processCellFilterIcons() {
     if (hedgeBookIdx !== -1) {
       const cell = cells[hedgeBookIdx];
       if (cell && !cell.querySelector('.cno-cell-filter-btn') && getCleanCellText(cell)) {
-        const filterBtn = createHoverFilterBtn('Show only rows with this hedge sportsbook', () => {
+        const filterBtn = createHoverFilterBtn('Refine to this hedge sportsbook (hides other rows; doesn\'t search CNO)', () => {
           setHedgeBookFilter(getCleanCellText(cell));
-        });
+        }, ROWS_FILTER_ICON_SVG);
         const qrBtn = cell.querySelector('.cno-qr-btn');
         if (qrBtn) qrBtn.parentNode.insertBefore(filterBtn, qrBtn);
         else getHoverTray(cell).appendChild(filterBtn);
@@ -3810,22 +3925,50 @@ function getCalcRowDeviggerUrl(btn) {
   if (!row || !table) return null;
 
   const cols = getListTableColumns(table);
-  if (cols.odds === -1 || cols.fairOdds === -1) return null;
-
+  if (cols.odds === -1) return null;
   const oddsCell = row.children[cols.odds];
-  const fairCell = row.children[cols.fairOdds];
-  if (!oddsCell || !fairCell) return null;
-
+  if (!oddsCell) return null;
   const finalOdds = extractAmericanOdds(getCleanCellText(oddsCell));
-  const fairOdds = extractAmericanOdds(getCleanCellText(fairCell));
-  if (!finalOdds || !fairOdds) return null;
+  if (!finalOdds) return null;
+
+  let fairOdds = null;
+  if (cols.fairOdds !== -1) {
+    const fairCell = row.children[cols.fairOdds];
+    fairOdds = fairCell ? extractAmericanOdds(getCleanCellText(fairCell)) : null;
+  } else {
+    // Promo pages with Profit Strategy = +EV have no Fair Odds column, but "EV Hit%" is the
+    // devigged (fair) chance the bet wins, so the fair odds follow from it. Not on Hedge.
+    const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+    if (heads.some(h => h.startsWith('hedge'))) return null;
+    const hitIdx = heads.indexOf('ev hit%');
+    const hitCell = hitIdx !== -1 ? row.children[hitIdx] : null;
+    const pct = hitCell ? parseFloat(getCleanCellText(hitCell).replace(/[^0-9.]/g, '')) : NaN;
+    fairOdds = cnoProbabilityToAmerican(pct / 100);
+  }
+  if (!fairOdds) return null;
 
   // Same URL format as the calc popup's "Open in Devigger" link
-  let url = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(fairOdds.replace('+', ''))}&FinalOdds=${encodeURIComponent(finalOdds.replace('+', ''))}`;
+  const headerTexts = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const eventIdx = headerTexts.indexOf('event');
+  const textAt = (i) => (i >= 0 && row.children[i]) ? getCleanCellText(row.children[i]) : '';
+  const legOdds = cnoBuildDeviggerLegOdds(fairOdds.replace('+', ''), textAt(eventIdx), textAt(cols.market), textAt(cols.betName));
+
+  // Odds Boost page with "Odds Surge": the surge amount is added to the odds themselves
+  let surgedOdds = finalOdds;
+  const onBoostPage = window.location.pathname.toLowerCase().includes('odds-boost.aspx');
+  const boostTypeEl = onBoostPage ? document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked') : null;
+  if (boostTypeEl && boostTypeEl.value === 'surge') {
+    const surgeInput = document.querySelector('#spanBoostOdds input[type="text"]');
+    const surge = surgeInput ? parseFloat(surgeInput.value.replace(/[^0-9.+-]/g, '')) : NaN;
+    const boosted = cnoAddToAmericanOdds(finalOdds, surge);
+    if (boosted) surgedOdds = boosted;
+  }
+
+  let url = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(legOdds)}&FinalOdds=${encodeURIComponent(surgedOdds.replace('+', ''))}`;
 
   // Odds Boost page: carry the profit boost, as the popup does
-  if (window.location.pathname.toLowerCase().includes('odds-boost.aspx')) {
-    const boostType = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
+  if (onBoostPage) {
+    const boostType = boostTypeEl;
     const pctInput = document.querySelector('#spanBoostPercentage input[type="text"]');
     const pct = pctInput ? pctInput.value.replace('%', '').trim() : '';
     if ((!boostType || boostType.value === 'profit') && pct && !isNaN(parseFloat(pct))) {
@@ -3879,19 +4022,10 @@ function processCalcButtons() {
     if (btn.dataset.cnoCalcReady) return;
     btn.dataset.cnoCalcReady = 'true';
     btn.classList.add('cno-calc-btn');
-    if (getCalcRowDeviggerUrl(btn)) btn.title = CALC_DEVIG_TOOLTIP;
+    if (btn.title === CALC_DEVIG_TOOLTIP) btn.removeAttribute('title'); // right-click devig was replaced by the FV Devig tab
   });
 }
 
-document.addEventListener('contextmenu', (e) => {
-  if (!isCnoListPage()) return;
-  const btn = getCalcButtonFromEvent(e);
-  if (!btn) return;
-  const url = getCalcRowDeviggerUrl(btn);
-  if (!url) return;
-  e.preventDefault();
-  showCalcDeviggerMenu(e.clientX, e.clientY, url);
-});
 
 document.addEventListener('click', () => {
   const menu = document.getElementById('cno-context-menu');
@@ -4007,6 +4141,13 @@ function openQrPopup(url, bookName, details = {}) {
   titleBook.textContent = bookName || 'Sportsbook';
   titleBook.style.cssText = 'font-weight: 700; font-size: 1rem; color: #0f172a;';
   title.appendChild(titleBook);
+
+  if (details.event) {
+    const titleEvent = document.createElement('div');
+    titleEvent.textContent = details.event;
+    titleEvent.style.cssText = 'font-weight: 500; font-size: 0.78rem; color: #64748b; margin-top: 2px;';
+    title.appendChild(titleEvent);
+  }
 
   const betLine = [details.market, details.betName].filter(Boolean).join(' ');
   if (betLine) {
@@ -4133,35 +4274,51 @@ function getHedgeBookColumnIndex(table) {
   });
 }
 
+// cnoHedgeBookFilter is null (no filter) or an array of hedge sportsbook names
 function setHedgeBookFilter(bookName) {
   if (!bookName) return;
-  cnoHedgeBookFilter = bookName;
+  cnoHedgeBookFilter = [bookName];
+  syncLowHoldHedgeBookPicker(cnoHedgeBookFilter);
+  processHedgeBookFilter();
+}
+
+function setHedgeBookFilterList(bookNames) {
+  cnoHedgeBookFilter = (bookNames && bookNames.length) ? bookNames.slice() : null;
   processHedgeBookFilter();
 }
 
 function clearHedgeBookFilter() {
   cnoHedgeBookFilter = null;
+  syncLowHoldHedgeBookPicker(null); // X: back to all books selected
   processHedgeBookFilter();
+}
+
+function formatHedgeFilterLabel(books) {
+  if (books.length === 1) return `Refined to ${books[0]} Hedge Sportsbook`;
+  const list = books.length === 2
+    ? `${books[0]} and ${books[1]}`
+    : `${books.slice(0, -1).join(', ')}, and ${books[books.length - 1]}`;
+  return `Refined to ${list} Hedge Sportsbooks`;
 }
 
 function processHedgeBookFilter() {
   const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
   let banner = document.getElementById('cno-hedge-filter-banner');
 
-  if (!cnoHedgeBookFilter) {
+  if (!cnoHedgeBookFilter || !cnoHedgeBookFilter.length) {
     if (banner) banner.remove();
     document.querySelectorAll('.cno-hedge-hidden').forEach(el => el.classList.remove('cno-hedge-hidden'));
     return;
   }
   if (!table || !isCnoListPage()) return;
 
-  const target = cnoHedgeBookFilter.toLowerCase();
+  const targets = new Set(cnoHedgeBookFilter.map(b => b.toLowerCase()));
   const hedgeIdx = getHedgeBookColumnIndex(table);
 
   if (hedgeIdx !== -1) {
     table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
       const cell = row.children[hedgeIdx];
-      const match = !!cell && getCleanCellText(cell).toLowerCase() === target;
+      const match = !!cell && targets.has(getCleanCellText(cell).toLowerCase());
       row.classList.toggle('cno-hedge-hidden', !match);
       // Keep an expanded (mobile/narrow view) detail row in step with its main row
       const next = row.nextElementSibling;
@@ -4191,9 +4348,13 @@ function processHedgeBookFilter() {
     bannerCell.appendChild(pill);
     const label = document.createElement('span');
     label.className = 'cno-hedge-filter-label';
+    const pillIcon = document.createElement('span');
+    pillIcon.innerHTML = ROWS_FILTER_ICON_SVG;
+    pillIcon.style.cssText = 'display:inline-flex; margin-right:-2px;';
+    pill.appendChild(pillIcon);
     const closeBtn = document.createElement('span');
     closeBtn.setAttribute('role', 'button');
-    closeBtn.title = 'Remove hedge sportsbook filter';
+    closeBtn.title = 'Remove this refinement';
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = 'cursor:pointer; padding:0 5px; border-radius:3px; font-weight:700; line-height:1.3;';
     closeBtn.addEventListener('mouseover', () => { closeBtn.style.background = '#bae6fd'; });
@@ -4207,7 +4368,7 @@ function processHedgeBookFilter() {
     pill.appendChild(closeBtn);
   }
 
-  const labelText = `Filtered to ${cnoHedgeBookFilter} Hedge Sportsbook`;
+  const labelText = formatHedgeFilterLabel(cnoHedgeBookFilter);
   const label = banner.querySelector('.cno-hedge-filter-label');
   if (label.textContent !== labelText) label.textContent = labelText;
 
@@ -4465,22 +4626,7 @@ function processInjuredRowExclusion() {
     });
   }
 
-  // Small note on the injury-status line above the table (uses space that's already reserved)
-  const banner = document.getElementById('cno-injury-refresh-banner');
-  let note = document.getElementById('cno-injured-hidden-note');
-  if (!active || !banner) {
-    if (note) note.remove();
-    return;
-  }
-  if (!note || note.parentNode !== banner) {
-    if (note) note.remove();
-    note = document.createElement('span');
-    note.id = 'cno-injured-hidden-note';
-    note.style.cssText = 'margin-right: auto; font-size: 0.7rem; font-weight: 500; color: #94a3b8;';
-    banner.insertBefore(note, banner.firstChild);
-  }
-  const text = `${hidden} row${hidden === 1 ? '' : 's'} hidden (injured players)`;
-  if (note.textContent !== text) note.textContent = text;
+  // The "N rows hidden" note above the table covers every row-hiding filter (processHiddenRowsNote)
 }
 
 // ====================================================
@@ -4507,4 +4653,1104 @@ function processUnusedExtraColumn() {
     const cell = row.children[idx];
     if (cell) cell.classList.toggle('cno-col-hidden', hide);
   });
+}
+
+// ====================================================
+// LOW HOLD: MULTI-SELECT HEDGE SPORTSBOOK FILTER
+// Lives at the bottom of "Execution & Hedging". Books come from the Sportsbook dropdown.
+// All (or none) selected = no filter. Otherwise, on Update, rows are filtered to those hedge
+// books the same way as the hedge-sportsbook filter icon.
+// ====================================================
+
+let cnoHedgeSwapParamUsed = false;
+
+function getLowHoldHedgeBookPicker() {
+  return document.getElementById('cno-lh-hedge-picker');
+}
+
+function getPickerChecks(picker) {
+  return Array.from(picker.querySelectorAll('input.cno-lh-hedge-book-cb'));
+}
+
+function updateLowHoldHedgePickerSummary(picker) {
+  const summary = picker.querySelector('.cno-lh-hedge-summary-text');
+  if (!summary) return;
+  const checks = getPickerChecks(picker);
+  const selected = checks.filter(c => c.checked).map(c => c.value);
+  let text;
+  if (selected.length === checks.length) text = 'All sportsbooks';
+  else if (selected.length === 0) text = 'None selected (treated as all)';
+  else if (selected.length <= 2) text = selected.join(', ');
+  else text = `${selected.length} of ${checks.length} sportsbooks`;
+  summary.textContent = text;
+  summary.parentElement.title = selected.length && selected.length < checks.length ? selected.join(', ') : '';
+}
+
+// null = select every book; an array = select just those books
+function syncLowHoldHedgeBookPicker(bookNames) {
+  const picker = getLowHoldHedgeBookPicker();
+  if (!picker) return;
+  const wanted = bookNames ? new Set(bookNames.map(b => b.toLowerCase())) : null;
+  getPickerChecks(picker).forEach(c => { c.checked = wanted ? wanted.has(c.value.toLowerCase()) : true; });
+  updateLowHoldHedgePickerSummary(picker);
+}
+
+function isHedgeBookPickerActive(picker) {
+  const field = picker.closest('.cno-field');
+  return !(field && field.style.display === 'none');
+}
+
+// Selected books, or null when all / none are selected (= no filter)
+function getHedgeBookPickerSelection() {
+  const picker = getLowHoldHedgeBookPicker();
+  if (!picker) return undefined;
+  const checks = getPickerChecks(picker);
+  const selected = checks.filter(c => c.checked).map(c => c.value);
+  return (selected.length === 0 || selected.length === checks.length) ? null : selected;
+}
+
+function applyLowHoldHedgeBookPickerOnUpdate() {
+  const picker = getLowHoldHedgeBookPicker();
+  if (!picker) return;
+  if (!isHedgeBookPickerActive(picker)) { setHedgeBookFilterList(null); return; }
+  const checks = getPickerChecks(picker);
+  const selected = checks.filter(c => c.checked).map(c => c.value);
+  if (selected.length === 0 || selected.length === checks.length) setHedgeBookFilterList(null);
+  else setHedgeBookFilterList(selected);
+}
+
+function createLowHoldHedgeBookPicker(elSportsbook) {
+  if (!elSportsbook) return null;
+  const books = Array.from(elSportsbook.options)
+    .filter(o => o.value && o.value !== '0' && o.value !== '-1' && o.text.trim().toLowerCase() !== 'all')
+    .map(o => o.text.replace(/\s+/g, ' ').trim());
+  if (!books.length) return null;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'cno-field';
+  wrapper.style.cssText = 'margin-top: 6px; position: relative;';
+
+  const label = document.createElement('label');
+  label.textContent = 'Refine: Hedge Books';
+
+  // Subtle "?" with an explanation on hover
+  const help = document.createElement('span');
+  help.textContent = '?';
+  help.setAttribute('aria-label', 'About this filter');
+  help.title = "This filter is applied by the extension, not by CNO. CNO still finds its usual results (up to your Result Count) for every hedge book. The extension then hides the rows whose hedge book isn't selected. So you may see fewer rows than your Result Count, and a matching bet that didn't make CNO's results won't appear. Use a large Result Count (e.g. 300) to make sure the books you want are in the results.";
+  help.style.cssText = `
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 12px; height: 12px; margin-left: 5px; vertical-align: middle;
+    border: 1px solid #cbd5e1; border-radius: 50%;
+    font-size: 0.6rem; font-weight: 700; line-height: 1; color: #94a3b8;
+    cursor: help; user-select: none;
+  `;
+  label.appendChild(createRowsFilterHint());
+  label.appendChild(help);
+  wrapper.appendChild(label);
+
+  const picker = document.createElement('div');
+  picker.id = 'cno-lh-hedge-picker';
+  picker.style.cssText = 'position: relative; width: 100%;';
+
+  // Closed state: looks like a dropdown
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.style.cssText = `
+    display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
+    padding: 5px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;
+    font-size: 0.82rem; color: #0f172a; cursor: pointer; text-align: left;
+  `;
+  const summaryText = document.createElement('span');
+  summaryText.className = 'cno-lh-hedge-summary-text';
+  summaryText.style.cssText = 'flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+  const caret = document.createElement('span');
+  caret.textContent = '▾';
+  caret.style.cssText = 'flex: 0 0 auto; color: #64748b;';
+  toggle.appendChild(summaryText);
+  toggle.appendChild(caret);
+
+  // Open state: quick actions + search + checkbox list
+  const panel = document.createElement('div');
+  panel.style.cssText = `
+    display: none; position: fixed; z-index: 1000001;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(15,23,42,0.16); overflow: hidden; min-width: 220px;
+  `;
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display: flex; gap: 6px; padding: 7px 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;';
+  const makeAction = (text, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.style.cssText = 'flex: 1; padding: 4px 6px; font-size: 0.75rem; font-weight: 700; color: #0369a1; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;';
+    b.addEventListener('mouseover', () => b.style.background = '#f0f9ff');
+    b.addEventListener('mouseout', () => b.style.background = '#ffffff');
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
+    return b;
+  };
+  const visibleChecks = () => getPickerChecks(picker).filter(c => c.closest('label').style.display !== 'none');
+  actions.appendChild(makeAction('Select all', () => { visibleChecks().forEach(c => c.checked = true); updateLowHoldHedgePickerSummary(picker); }));
+  actions.appendChild(makeAction('Select none', () => { visibleChecks().forEach(c => c.checked = false); updateLowHoldHedgePickerSummary(picker); }));
+
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.placeholder = 'Search sportsbooks…';
+  search.style.cssText = 'display: block; width: calc(100% - 16px); margin: 7px 8px 4px; padding: 4px 7px; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box;';
+  search.dataset.hasEnterSubmit = 'true'; // Enter here shouldn't run Update
+  search.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } });
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    getPickerChecks(picker).forEach(c => {
+      c.closest('label').style.display = !q || c.value.toLowerCase().includes(q) ? 'flex' : 'none';
+    });
+  });
+
+  const list = document.createElement('div');
+  list.style.cssText = 'max-height: 230px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 6px;'; // scrolling past the end doesn't scroll the page
+  books.forEach(book => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 500; color: #0f172a; margin: 0;';
+    row.addEventListener('mouseover', () => row.style.background = '#f0f9ff');
+    row.addEventListener('mouseout', () => row.style.background = 'none');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'cno-lh-hedge-book-cb';
+    cb.value = book;
+    cb.checked = true; // default: all selected
+    cb.style.cssText = 'width: 14px; height: 14px; margin: 0; accent-color: #0284c7; cursor: pointer; flex-shrink: 0;';
+    cb.addEventListener('change', () => updateLowHoldHedgePickerSummary(picker));
+    const span = document.createElement('span');
+    span.textContent = book;
+    row.appendChild(cb);
+    row.appendChild(span);
+    list.appendChild(row);
+  });
+
+  const hint = document.createElement('div');
+  hint.textContent = 'Applies when you click Update. None selected = all.';
+  hint.style.cssText = 'padding: 6px 10px; font-size: 0.7rem; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0;';
+
+  panel.appendChild(actions);
+  panel.appendChild(search);
+  panel.appendChild(list);
+  panel.appendChild(hint);
+  picker.appendChild(toggle);
+  picker.appendChild(panel);
+  wrapper.appendChild(picker);
+
+  // Fixed positioning so the filter panel's container can't clip the list
+  const place = () => {
+    const r = toggle.getBoundingClientRect();
+    const width = Math.max(r.width, 220);
+    panel.style.width = `${width}px`;
+    panel.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - width - 8))}px`;
+    const below = window.innerHeight - r.bottom;
+    if (below < 300 && r.top > below) {
+      panel.style.top = '';
+      panel.style.bottom = `${window.innerHeight - r.top + 3}px`;
+    } else {
+      panel.style.bottom = '';
+      panel.style.top = `${r.bottom + 3}px`;
+    }
+  };
+  const open = () => { panel.style.display = 'block'; place(); search.value = ''; search.dispatchEvent(new Event('input')); search.focus(); };
+  const close = () => { panel.style.display = 'none'; };
+  window.addEventListener('scroll', (e) => { if (panel.style.display !== 'none' && !panel.contains(e.target)) close(); }, true);
+  window.addEventListener('resize', close);
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (panel.style.display === 'none') open(); else close();
+  });
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', (e) => { if (!picker.contains(e.target)) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panel.style.display !== 'none') close(); });
+
+  // Keep in step with a filter set from the table's hedge-sportsbook icon
+  if (cnoHedgeBookFilter && cnoHedgeBookFilter.length) {
+    const wanted = new Set(cnoHedgeBookFilter.map(b => b.toLowerCase()));
+    getPickerChecks(picker).forEach(c => { c.checked = wanted.has(c.value.toLowerCase()); });
+  } else if (!cnoHedgeSwapParamUsed) {
+    // Arrived via Swap Page with a narrowed selection: pre-select it and filter the results
+    cnoHedgeSwapParamUsed = true;
+    let fromSwap = null;
+    try { fromSwap = new URLSearchParams(window.location.search).get('cno_hedge_books'); } catch (e) { /* ignore */ }
+    if (fromSwap) {
+      const wanted = new Set(fromSwap.split('|').map(b => b.trim().toLowerCase()).filter(Boolean));
+      getPickerChecks(picker).forEach(c => { c.checked = wanted.has(c.value.toLowerCase()); });
+      setTimeout(() => {
+        // Visibility (Profit Strategy = Hedge) is set right after the picker is built
+        if (document.getElementById('cno-lh-hedge-picker') === picker && isHedgeBookPickerActive(picker)) {
+          const sel = getHedgeBookPickerSelection();
+          if (sel) setHedgeBookFilterList(sel);
+        }
+      }, 0);
+    }
+  }
+  updateLowHoldHedgePickerSummary(picker);
+  return wrapper;
+}
+
+// ====================================================
+// "EXCLUDE PLAYER UNDERS" (Market Parameters)
+// Hides rows whose Market contains "player" and whose Bet Name has the word "under" (with
+// spaces around it) or the whole word "no". Remembered per page; applies right away and after
+// every Update. The site's results aren't changed, only which rows are shown.
+// ====================================================
+
+function getExcludePlayerUndersKey() {
+  return `cno_exclude_player_unders_${getSavedFiltersPageKey()}`;
+}
+
+function isExcludePlayerUndersOn() {
+  try { return localStorage.getItem(getExcludePlayerUndersKey()) === 'true'; } catch (e) { return false; }
+}
+
+function createExcludePlayerUndersRow() {
+  const row = document.createElement('div');
+  row.className = 'cno-row-inline';
+
+  const label = document.createElement('label');
+  label.className = 'cno-checkbox-group';
+  label.title = 'Hides player-prop rows for Unders and "No" bets. This hides rows CNO already returned; it does not change what CNO searches, so use a large Result Count (e.g. 300) to still get a full list.';
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.id = 'cno-exclude-player-unders-cb';
+  cb.checked = isExcludePlayerUndersOn();
+  cb.addEventListener('change', () => {
+    try { localStorage.setItem(getExcludePlayerUndersKey(), cb.checked ? 'true' : 'false'); } catch (e) { /* ignore */ }
+    processExcludePlayerUnders();
+  });
+
+  label.appendChild(cb);
+  label.appendChild(document.createTextNode(' Exclude Player Unders'));
+  label.appendChild(createRowsFilterHint());
+  row.appendChild(label);
+  return row;
+}
+
+function isPlayerUnderBet(betName) {
+  const text = ` ${(betName || '').replace(/\s+/g, ' ').trim()} `;
+  return /\sunder\s/i.test(text) || /\sno\s/i.test(text);
+}
+
+function processExcludePlayerUnders() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const cb = document.getElementById('cno-exclude-player-unders-cb');
+  // The checkbox is the source of truth when it's on the page; otherwise use the saved choice
+  const on = cb ? cb.checked : isExcludePlayerUndersOn();
+
+  if (!table || !on || !isCnoListPage()) {
+    document.querySelectorAll('.cno-under-hidden').forEach(el => el.classList.remove('cno-under-hidden'));
+    return;
+  }
+
+  const cols = getListTableColumns(table);
+  if (cols.market === -1 || cols.betName === -1) return;
+
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    const marketCell = row.children[cols.market];
+    const betCell = row.children[cols.betName];
+    const hide = !!marketCell && !!betCell &&
+      getCleanCellText(marketCell).toLowerCase().includes('player') &&
+      isPlayerUnderBet(getCleanCellText(betCell));
+    row.classList.toggle('cno-under-hidden', hide);
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-under-hidden', hide);
+  });
+}
+
+// ====================================================
+// CNO "DEFAULTS" (Settings page) FOR CLEAR FILTERS
+// CNO keeps these in cookies and fills them into its Settings page, so the extension reads them
+// from that page (fetched in the background with the user's own cookies, like a normal visit)
+// rather than from the cookies themselves: no extra permission, and always what CNO shows.
+// Cached for 24 hours; visiting the Settings page drops the cache so changes are picked up.
+// ====================================================
+
+const CNO_SITE_DEFAULTS_KEY = 'cno_site_defaults_cache';
+const CNO_SITE_DEFAULTS_TTL_MS = 24 * 60 * 60 * 1000;
+const CNO_SETTINGS_PAGE_URL = '/site/account/settings.aspx';
+
+// Settings page field -> what it means on the tool pages
+function parseSiteDefaults(html) {
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  const byId = (suffix) => d.querySelector(`[id$="${suffix}"]`);
+  const selectVal = (suffix) => {
+    const el = byId(suffix);
+    if (!el) return undefined;
+    const opt = el.querySelector('option[selected]') || el.querySelector('option');
+    return opt ? opt.getAttribute('value') : undefined;
+  };
+  const textVal = (suffix) => { const el = byId(suffix); return el ? (el.getAttribute('value') || '') : undefined; };
+  const checkVal = (suffix) => { const el = byId(suffix); return el ? el.hasAttribute('checked') : undefined; };
+
+  // Mainlines Only: Not Specified / Yes / No (the checked radio's position)
+  let mainlines;
+  const radios = Array.from(d.querySelectorAll('input[type="radio"][id*="RadioButtonListIsMain"]'));
+  if (radios.length) {
+    const idx = radios.findIndex(r => r.hasAttribute('checked'));
+    const label = idx >= 0 ? ((d.querySelector(`label[for="${radios[idx].id}"]`) || {}).textContent || '').trim().toLowerCase() : '';
+    mainlines = label === 'yes' || (idx === 1 && !label);
+  }
+
+  return {
+    DropDownListDevigMethod: selectVal('DropDownListDevigMethod'),
+    DropDownListProfitStrategy: selectVal('DropDownListProfitStrategy'),
+    DropDownListSortBy: selectVal('DropDownListSortBy'),
+    TextBoxMinimumEVPercentage: textVal('TextBoxMinimumEVPercentage'),
+    TextBoxMinimumLiquidity: textVal('TextBoxMinimumLiquidity'),
+    TextBoxMinimumSubMarketSideCount: textVal('TextBoxMinimumSubMarketSideCount'),
+    TextBoxMaximumSubMarketSideCount: textVal('TextBoxMaximumSubMarketSideCount'),
+    CheckBoxRequireACompleteSportsbook: checkVal('CheckBoxRequireACompleteSportsbook'),
+    TextBoxMinimumOddsProviderCount: textVal('TextBoxMinimumOddsProviderCount'),
+    mainlines
+  };
+}
+
+function getSiteDefaults(callback) {
+  chrome.storage.local.get([CNO_SITE_DEFAULTS_KEY], (data) => {
+    const cached = data && data[CNO_SITE_DEFAULTS_KEY];
+    if (cached && cached.values && (Date.now() - (cached.ts || 0)) < CNO_SITE_DEFAULTS_TTL_MS) {
+      callback(cached.values);
+      return;
+    }
+    // Absolute URL: Firefox resolves a relative fetch() in a content script differently than Chrome
+    fetch(new URL(CNO_SETTINGS_PAGE_URL, window.location.origin).href, { credentials: 'include' })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(html => {
+        const values = parseSiteDefaults(html);
+        if (!values.DropDownListDevigMethod && values.TextBoxMinimumOddsProviderCount === undefined) throw new Error('no defaults found');
+        chrome.storage.local.set({ [CNO_SITE_DEFAULTS_KEY]: { ts: Date.now(), values } });
+        callback(values);
+      })
+      .catch(err => {
+        console.warn('CNO Helper: could not read CNO default settings', err);
+        callback(cached && cached.values ? cached.values : null); // an old copy beats nothing
+      });
+  });
+}
+
+function applySiteDefaults(container = document) {
+  getSiteDefaults((values) => {
+    if (!values) return;
+    const getEl = (suffix) => container.querySelector(`[id$="${suffix}"]`) || document.querySelector(`[id$="${suffix}"]`);
+
+    ['DropDownListDevigMethod', 'DropDownListProfitStrategy', 'DropDownListSortBy'].forEach(suffix => {
+      const el = getEl(suffix);
+      const v = values[suffix];
+      if (!el || v === undefined || v === null) return;
+      if (Array.from(el.options).some(o => o.value === v) && el.value !== v) {
+        el.value = v;
+        el.dispatchEvent(new Event('change', { bubbles: true })); // e.g. Profit Strategy shows/hides the hedge options
+      }
+    });
+
+    ['TextBoxMinimumEVPercentage', 'TextBoxMinimumLiquidity', 'TextBoxMinimumSubMarketSideCount',
+     'TextBoxMaximumSubMarketSideCount', 'TextBoxMinimumOddsProviderCount'].forEach(suffix => {
+      const el = getEl(suffix);
+      const v = values[suffix];
+      if (!el || v === undefined) return;
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    const req = getEl('CheckBoxRequireACompleteSportsbook');
+    if (req && typeof values.CheckBoxRequireACompleteSportsbook === 'boolean' && req.checked !== values.CheckBoxRequireACompleteSportsbook) {
+      req.checked = values.CheckBoxRequireACompleteSportsbook;
+      req.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Mainlines Only: checked only when the default is "Yes" ("Not Specified" / "No" leave it unchecked)
+    const main = getEl('CheckBoxIsMain');
+    if (main && typeof values.mainlines === 'boolean' && main.checked !== values.mainlines) {
+      main.checked = values.mainlines;
+      main.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+
+// On CNO's Settings page, forget the cached defaults so the next Clear Filters reads fresh ones
+if (/\/site\/account\/settings\.aspx/i.test(window.location.pathname)) {
+  try { chrome.storage.local.remove(CNO_SITE_DEFAULTS_KEY); } catch (e) { /* ignore */ }
+  document.addEventListener('submit', () => { try { chrome.storage.local.remove(CNO_SITE_DEFAULTS_KEY); } catch (e) { /* ignore */ } }, true);
+}
+
+// ----------------------------------------------------
+// Saved filters vs. CNO defaults
+// ----------------------------------------------------
+
+const CNO_DEFAULT_SELECT_FIELDS = ['DropDownListDevigMethod', 'DropDownListProfitStrategy', 'DropDownListSortBy'];
+const CNO_DEFAULT_TEXT_FIELDS = ['TextBoxMinimumEVPercentage', 'TextBoxMinimumLiquidity', 'TextBoxMinimumSubMarketSideCount',
+  'TextBoxMaximumSubMarketSideCount', 'TextBoxMinimumOddsProviderCount'];
+
+const cnoNormText = (v) => String(v === undefined || v === null ? '' : v).replace(/\s+/g, '').toLowerCase();
+
+// Remove the fields whose value equals the user's default (and mark the filter as such)
+function stripDefaultSelections(sel, defaults) {
+  sel.omitsDefaults = true;
+  CNO_DEFAULT_SELECT_FIELDS.forEach(f => {
+    if (sel.selects && sel.selects[f] && defaults[f] !== undefined && sel.selects[f].value === defaults[f]) delete sel.selects[f];
+  });
+  CNO_DEFAULT_TEXT_FIELDS.forEach(f => {
+    if (sel.texts && sel.texts[f] !== undefined && defaults[f] !== undefined && cnoNormText(sel.texts[f]) === cnoNormText(defaults[f])) delete sel.texts[f];
+  });
+  if (sel.checks) {
+    if (sel.checks.requireComplete !== undefined && typeof defaults.CheckBoxRequireACompleteSportsbook === 'boolean' &&
+        sel.checks.requireComplete === defaults.CheckBoxRequireACompleteSportsbook) delete sel.checks.requireComplete;
+    if (sel.checks.main !== undefined && typeof defaults.mainlines === 'boolean' && sel.checks.main === defaults.mainlines) delete sel.checks.main;
+  }
+  return sel;
+}
+
+// Put the default value back for every default field the filter doesn't carry
+function fillDefaultSelections(sel, defaults) {
+  const out = JSON.parse(JSON.stringify(sel));
+  out.selects = out.selects || {};
+  out.texts = out.texts || {};
+  out.checks = out.checks || {};
+  CNO_DEFAULT_SELECT_FIELDS.forEach(f => {
+    if (!out.selects[f] && defaults[f] !== undefined && defaults[f] !== null) out.selects[f] = { value: defaults[f], text: '' };
+  });
+  CNO_DEFAULT_TEXT_FIELDS.forEach(f => {
+    if (out.texts[f] === undefined && defaults[f] !== undefined) out.texts[f] = defaults[f];
+  });
+  if (out.checks.requireComplete === undefined && typeof defaults.CheckBoxRequireACompleteSportsbook === 'boolean') out.checks.requireComplete = defaults.CheckBoxRequireACompleteSportsbook;
+  if (out.checks.main === undefined && typeof defaults.mainlines === 'boolean') out.checks.main = defaults.mainlines;
+  return out;
+}
+
+// Small light-grey "funnel over rows" mark next to filters that hide rows from the results
+// instead of running a new search (Exclude injured, Exclude Player Unders, Hedge Sportsbook Filter)
+function createRowsFilterHint() {
+  const mark = document.createElement('span');
+  mark.className = 'cno-rows-filter-hint';
+  mark.title = "Hides rows from the current results (doesn't search CNO)";
+  mark.innerHTML = ROWS_FILTER_ICON_SVG.replace('width="15" height="15"', 'width="11" height="11"');
+  mark.style.cssText = 'display:inline-flex; align-items:center; margin-left:-2px; color:#94a3b8; vertical-align:middle; flex-shrink:0;'; // tucked right up against the label (the labels' own gap adds space otherwise)
+  return mark;
+}
+
+// ====================================================
+// RESULTS TABLES ON THE TOOL PAGES: MODERNIZED LOOK ("Restyle Results Tables" option)
+// Column roles come from the header text, so they follow whatever columns the page shows
+// (and Profit Strategy adding/removing hedge columns). Re-applied after every update.
+// - Price columns: odds centered, "$liquidity · price¢" small underneath (amber under the
+//   threshold set on game pages); narrow, with the header wrapping to two lines
+// - Date: the day on the first line, the time smaller underneath
+// - Books / EV Hit%: a little quieter; the metric (EV%/HV%/ROI%) stronger and middle-aligned
+// - Headers bottom-aligned, cells top-aligned
+// - "FV Devig ↗" tab that appears under the Calc button on hover (the button itself is left
+//   where the site put it: its click handler finds the row from the button's position)
+// ====================================================
+
+function isMainTableModern() {
+  return isCnoListPage() && typeof userSettings !== 'undefined' && userSettings.modernizeMainTables !== false;
+}
+
+function getMainTableRoles(table) {
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  return ths.map(th => {
+    const h = th.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (h === 'calc') return 'calc';
+    if (h === 'date') return 'date';
+    if (h === 'sport') return 'sport';
+    if (h === 'league') return 'league';
+    if (h === 'books' || h === 'ev hit%') return 'muted';
+    if (h.endsWith('%')) return 'metric';
+    if (h === 'odds' || h.endsWith(' odds')) return 'price';
+    if (h === 'bet' || h.endsWith(' name')) return 'name';
+    return '';
+  });
+}
+
+const MAIN_ROLE_CLASSES = ['lh-calc', 'lh-date', 'lh-sport-col', 'lh-league', 'lh-muted', 'lh-metric', 'lh-price', 'lh-betname'];
+const MAIN_ROLE_TO_CLASS = { calc: 'lh-calc', date: 'lh-date', sport: 'lh-sport-col', league: 'lh-league', muted: 'lh-muted', metric: 'lh-metric', price: 'lh-price', name: 'lh-betname' };
+
+function setMainTableRestyle(on) {
+  if (typeof userSettings !== 'undefined') userSettings.modernizeMainTables = on;
+  try { chrome.storage.local.set({ modernizeMainTables: on }); } catch (e) { /* ignore */ }
+  processMainTableModern();
+}
+
+// Classic / enhanced switch, at the right end of the line just above the table
+function ensureMainTableSwitch(table, modern) {
+  let btn = document.getElementById('cno-main-table-switch');
+  const label = modern ? '📜 Show classic table' : '⚡ Show enhanced table';
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'cno-main-table-switch';
+    btn.className = 'cno-gt-switch';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setMainTableRestyle(!(typeof userSettings !== 'undefined' && userSettings.modernizeMainTables !== false));
+    });
+  }
+  if (btn.textContent !== label) btn.textContent = label;
+  btn.title = modern
+    ? 'Show the table the way CNO draws it (same as turning off "Restyle Results Tables" in the options)'
+    : 'Turn the restyled table back on (same as "Restyle Results Tables" in the options)';
+
+  // Lives on the injury-status line (which always reserves its space above the table)
+  const banner = document.getElementById('cno-injury-refresh-banner');
+  if (banner) {
+    if (btn.parentNode !== banner || banner.lastElementChild !== btn) {
+      btn.style.marginLeft = '12px';
+      banner.appendChild(btn);
+    }
+  } else if (btn.nextElementSibling !== table) {
+    btn.style.marginLeft = '';
+    table.parentNode.insertBefore(btn, table);
+  }
+}
+
+// "Tomorrow at 1:00 PM" -> day line + smaller time line (the original text is kept to put back)
+function splitDateCell(td) {
+  const el = td.querySelector('datetime') || td;
+  if (el.dataset.lhRendered !== undefined && el.textContent === el.dataset.lhRendered) return;
+  const text = el.textContent.replace(/\s+/g, ' ').trim();
+  const m = text.match(/^(.*?)\s+at\s+(.+)$/i);
+  if (!m) return;
+  el.dataset.lhOrig = el.textContent;
+  el.textContent = '';
+  const day = document.createElement('span');
+  day.className = 'lh-day';
+  day.textContent = m[1];
+  const time = document.createElement('span');
+  time.className = 'lh-time';
+  time.textContent = m[2];
+  el.appendChild(day);
+  el.appendChild(time);
+  el.dataset.lhRendered = el.textContent;
+}
+
+function restoreDateCells(table) {
+  table.querySelectorAll('[data-lh-orig]').forEach(el => {
+    if (el.dataset.lhRendered !== undefined && el.textContent === el.dataset.lhRendered) el.textContent = el.dataset.lhOrig;
+    delete el.dataset.lhOrig;
+    delete el.dataset.lhRendered;
+  });
+}
+
+function restoreMainTable(table) {
+  table.classList.remove('lh-main');
+  table.style.removeProperty('--lh-row-pad');
+  if (typeof restoreSplitCells === 'function') restoreSplitCells(table);
+  restoreDateCells(table);
+  table.querySelectorAll('.cno-fv-pop').forEach(el => el.remove());
+  table.querySelectorAll('.lh-has-fv').forEach(el => el.classList.remove('lh-has-fv'));
+  table.querySelectorAll('.lh-has-sub').forEach(el => el.classList.remove('lh-has-sub'));
+  table.querySelectorAll('[data-lh-sport]').forEach(el => el.removeAttribute('data-lh-sport'));
+  table.classList.remove('lh-has-league');
+  table.querySelectorAll(MAIN_ROLE_CLASSES.map(c => '.' + c).join(',')).forEach(el => el.classList.remove(...MAIN_ROLE_CLASSES));
+}
+
+function processMainTableModern() {
+  if (!isCnoListPage()) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!table) return;
+  const modern = isMainTableModern();
+  ensureMainTableSwitch(table, modern);
+
+  if (!modern) {
+    if (table.classList.contains('lh-main')) restoreMainTable(table);
+    return;
+  }
+
+  if (typeof loadGameTablePrefs === 'function') loadGameTablePrefs(); // liquidity threshold
+  table.classList.add('lh-main');
+  const pad = { compact: '5px', standard: '7px', spacious: '10px' }[userSettings.mainTableDensity] || '7px';
+  if (table.style.getPropertyValue('--lh-row-pad') !== pad) table.style.setProperty('--lh-row-pad', pad);
+
+  const roles = getMainTableRoles(table);
+  const sportIdx = roles.indexOf('sport');
+  const leagueIdx = roles.indexOf('league');
+  const threshold = typeof cnoGameLiqThreshold === 'number' ? cnoGameLiqThreshold : 100;
+
+  const fairIdx = Array.from(table.querySelectorAll('thead th')).findIndex(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === 'fair odds');
+  Array.from(table.querySelectorAll('thead th')).forEach((th, i) => {
+    MAIN_ROLE_CLASSES.forEach(c => th.classList.toggle(c, MAIN_ROLE_TO_CLASS[roles[i]] === c));
+    th.classList.toggle('lh-fair', i === fairIdx);
+  });
+
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    if (row.children.length < 2) return;
+    Array.from(row.children).forEach((td, i) => {
+      const role = roles[i];
+      MAIN_ROLE_CLASSES.forEach(c => td.classList.toggle(c, MAIN_ROLE_TO_CLASS[role] === c));
+      if (role === 'price' && typeof splitExchangeCell === 'function') {
+        splitExchangeCell(td);
+        const sub = td.querySelector('.lh-sub');
+        if (sub) sub.classList.toggle('lh-low', Number(sub.dataset.liq) < threshold);
+        td.classList.toggle('lh-has-sub', !!sub);
+      } else if (role === 'date') {
+        splitDateCell(td);
+      } else if (role === 'calc') {
+        updateFvDevigPop(td);
+      }
+    });
+    // Sport shown as a small line above the League (via CSS, so the League cell's text is unchanged)
+    if (sportIdx !== -1 && leagueIdx !== -1) {
+      const sportCell = row.children[sportIdx];
+      const leagueCell = row.children[leagueIdx];
+      const sport = sportCell ? getCleanCellText(sportCell) : '';
+      if (leagueCell && leagueCell.getAttribute('data-lh-sport') !== sport) leagueCell.setAttribute('data-lh-sport', sport);
+    }
+  });
+  table.classList.toggle('lh-has-league', sportIdx !== -1 && leagueIdx !== -1);
+
+  table.dataset.lhMainDone = 'true';
+}
+
+// "FV Devig ↗" under the Calc button, shown while the Calc cell is hovered. It's a separate
+// element in the same cell (absolutely positioned, so it doesn't change the row's height).
+// Built as a small stack so a "CustFV Devig" link can be added under it later.
+function updateFvDevigPop(td) {
+  const btn = td.querySelector('input[type="button"][value="Calc"]');
+  const url = btn && typeof getCalcRowDeviggerUrl === 'function' ? getCalcRowDeviggerUrl(btn) : null;
+  let pop = td.querySelector('.cno-fv-pop');
+  if (!url) {
+    if (pop) pop.remove();
+    td.classList.remove('lh-has-fv');
+    return;
+  }
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.className = 'cno-fv-pop';
+    const link = document.createElement('a');
+    link.className = 'cno-fv-link';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.title = 'Open this bet in the Devigger using the listed Fair Odds';
+    link.innerHTML = 'FV Devig <span aria-hidden="true">↗</span>';
+    pop.appendChild(link);
+    td.appendChild(pop);
+  }
+  const link = pop.querySelector('a.cno-fv-link');
+  if (link.getAttribute('href') !== url) link.setAttribute('href', url);
+  td.classList.add('lh-has-fv');
+}
+
+// Line the pop up under the button when the cell is hovered
+document.addEventListener('mouseover', (e) => {
+  const td = e.target && e.target.closest ? e.target.closest('td.lh-calc.lh-has-fv') : null;
+  if (!td) return;
+  const btn = td.querySelector('input[type="button"][value="Calc"]');
+  const pop = td.querySelector('.cno-fv-pop');
+  if (!btn || !pop) return;
+  pop.style.left = `${btn.offsetLeft}px`;
+  pop.style.top = `${btn.offsetTop + btn.offsetHeight + 5}px`; // a small gap, so Calc stays easy to click
+  pop.style.minWidth = `${btn.offsetWidth}px`;
+});
+
+// Restyle a freshly drawn results table before the browser paints it (no flash of the old look)
+if (isCnoListPage()) {
+  new MutationObserver(() => {
+    if (typeof userSettingsLoaded !== 'undefined' && !userSettingsLoaded) return;
+    const t = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+    if (!t || t.dataset.lhMainDone || !isMainTableModern()) return;
+    try { processMainTableModern(); } catch (e) { console.warn('CNO Helper: results table restyle error', e); }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+
+// CNO's Calc popup copies the row's text (date, odds, fair odds...) from the table when Calc is
+// clicked. Just before that, put this row's restyled cells back to the site's original text, then
+// restyle them again right after, so the popup gets exactly what it expects.
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('input[type="button"][value="Calc"]') : null;
+  if (!btn) return;
+  const table = btn.closest('#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main');
+  const row = btn.closest('tr');
+  if (!table || !row) return;
+  if (typeof restoreSplitCells === 'function') restoreSplitCells(row);
+  restoreDateCells(row);
+  setTimeout(() => { try { processMainTableModern(); } catch (err) { /* ignore */ } }, 0);
+}, true);
+
+// 0.2197 -> "+355", 0.75 -> "-300"
+function cnoProbabilityToAmerican(p) {
+  if (!isFinite(p) || p <= 0 || p >= 1) return null;
+  const dec = 1 / p;
+  const american = dec >= 2 ? Math.round((dec - 1) * 100) : -Math.round(100 / (dec - 1));
+  return american > 0 ? `+${american}` : String(american);
+}
+
+// Adds a surge amount to American odds, stepping across the gap between -100 and +100
+// (there are no odds in between): -110 + 20 = +110, -120 + 15 = -105, +150 + 25 = +175.
+function cnoAddToAmericanOdds(odds, add) {
+  const a = parseInt(String(odds).replace('+', ''), 10);
+  if (isNaN(a) || !isFinite(add) || add === 0) return null;
+  const x = a >= 100 ? a - 100 : a + 100;   // continuous scale: -110 -> -10, +110 -> +10
+  const y = x + add;
+  const result = y >= 0 ? Math.round(y + 100) : Math.round(y - 100);
+  return result > 0 ? `+${result}` : String(result);
+}
+
+// ====================================================
+// ODDS BOOST: DEFAULT BOOST AMOUNT ("Set as default | Clear" next to Boost Amount)
+// Saves the current boost type + amount. On page load (and after Clear Filters) an empty boost
+// box gets the default; a value already there (Swap Page, saved filter) is left alone.
+// ====================================================
+
+const CNO_BOOST_DEFAULT_KEY = 'cno_default_boost';
+let cnoBoostDefault = null;
+let cnoBoostDefaultLoaded = false;
+let cnoBoostDefaultAppliedOnLoad = false;
+
+if (window.location.pathname.toLowerCase().includes('odds-boost.aspx')) {
+  try {
+    chrome.storage.local.get([CNO_BOOST_DEFAULT_KEY], (d) => {
+      cnoBoostDefault = (d && d[CNO_BOOST_DEFAULT_KEY]) || null;
+      cnoBoostDefaultLoaded = true;
+      updateBoostDefaultLinks();
+    });
+  } catch (e) { cnoBoostDefaultLoaded = true; }
+}
+
+function getBoostInputs() {
+  const pctSpan = document.getElementById('spanBoostPercentage');
+  const oddsSpan = document.getElementById('spanBoostOdds');
+  return {
+    pct: pctSpan ? pctSpan.querySelector('input[type="text"]') : null,
+    odds: oddsSpan ? oddsSpan.querySelector('input[type="text"]') : null
+  };
+}
+
+function createBoostDefaultLinks() {
+  const wrap = document.createElement('span');
+  wrap.id = 'cno-boost-default-links';
+  wrap.style.cssText = 'margin-left: 8px; font-size: 0.72rem !important; font-weight: 500 !important; color: #94a3b8 !important; text-transform: none; letter-spacing: 0;';
+
+  const mk = (text, title, onClick) => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = text;
+    a.title = title;
+    a.tabIndex = -1;
+    a.style.cssText = 'color: #64748b !important; text-decoration: none; font-weight: 500 !important;';
+    a.addEventListener('mouseover', () => { a.style.textDecoration = 'underline'; });
+    a.addEventListener('mouseout', () => { a.style.textDecoration = 'none'; });
+    a.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onClick(); });
+    return a;
+  };
+
+  const setLink = mk('Set as default', 'Use the current boost type and amount whenever this page opens', () => {
+    const typeEl = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
+    const { pct, odds } = getBoostInputs();
+    const value = {
+      type: typeEl ? typeEl.value : 'profit',
+      pct: pct ? pct.value.trim() : '',
+      odds: odds ? odds.value.trim() : ''
+    };
+    if (!value.pct && !value.odds) {
+      showSavedFilterToast('Enter a boost amount first.');
+      return;
+    }
+    cnoBoostDefault = value;
+    chrome.storage.local.set({ [CNO_BOOST_DEFAULT_KEY]: value }, () => {
+      showSavedFilterToast(`Default boost saved: ${value.type === 'surge' ? value.odds : value.pct + '%'}`.replace('%%', '%'));
+      updateBoostDefaultLinks();
+    });
+  });
+  const sep = document.createElement('span');
+  sep.textContent = ' | ';
+  sep.style.cssText = 'color: #cbd5e1 !important;';
+  const clearLink = mk('Clear', 'Stop filling in a default boost', () => {
+    cnoBoostDefault = null;
+    chrome.storage.local.remove(CNO_BOOST_DEFAULT_KEY, () => {
+      showSavedFilterToast('Default boost cleared.');
+      updateBoostDefaultLinks();
+    });
+  });
+  clearLink.className = 'cno-boost-default-clear';
+
+  wrap.appendChild(setLink);
+  wrap.appendChild(sep);
+  wrap.appendChild(clearLink);
+  return wrap;
+}
+
+function updateBoostDefaultLinks() {
+  const clearLink = document.querySelector('#cno-boost-default-links .cno-boost-default-clear');
+  if (!clearLink) return;
+  const has = !!cnoBoostDefault;
+  clearLink.style.opacity = has ? '1' : '0.45';
+  clearLink.style.pointerEvents = has ? 'auto' : 'none';
+  const label = clearLink.closest('label');
+  if (label) label.title = has ? `Default boost: ${cnoBoostDefault.type === 'surge' ? cnoBoostDefault.odds : cnoBoostDefault.pct}` : '';
+}
+
+// Fill an empty boost box with the default. force: after Clear Filters (boxes were just emptied)
+function applyBoostDefault(force = false) {
+  if (!cnoBoostDefault) return;
+  const { pct, odds } = getBoostInputs();
+  if (!pct && !odds) return;
+  if (!force && ((pct && pct.value.trim()) || (odds && odds.value.trim()))) return; // something's already there
+
+  const radio = document.querySelector(`input[name$="RadioButtonListOddsBoostType"][value="${cnoBoostDefault.type}"]`);
+  if (radio && !radio.checked) {
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (pct && cnoBoostDefault.pct !== undefined) pct.value = cnoBoostDefault.pct;
+  if (odds && cnoBoostDefault.odds !== undefined) odds.value = cnoBoostDefault.odds;
+  syncBoostUIState(getFilterAccordionContainer() || document);
+}
+
+// Once per page load, after the filter panel is ready (and after any saved-filter apply)
+function processBoostDefaultOnLoad() {
+  if (cnoBoostDefaultAppliedOnLoad || !cnoBoostDefaultLoaded) return;
+  if (!window.location.pathname.toLowerCase().includes('odds-boost.aspx')) { cnoBoostDefaultAppliedOnLoad = true; return; }
+  const container = getFilterAccordionContainer();
+  if (container && !container.classList.contains('cno-ready')) return;
+  try { if (sessionStorage.getItem(PENDING_FILTER_APPLY_KEY)) return; } catch (e) { /* ignore */ }
+  cnoBoostDefaultAppliedOnLoad = true;
+  applyBoostDefault(false);
+  updateBoostDefaultLinks();
+}
+
+// ====================================================
+// MULTI-LEAGUE FILTER (Market Parameters)
+// Pick several leagues; rows from other leagues are hidden (CNO's results aren't changed).
+// Only usable when League is "All". The choices are the League dropdown's leagues, limited to the
+// selected Sport when there is one. Cleared by Clear Filters; saved with saved filters.
+// ====================================================
+
+let cnoMultiLeagueSelection = null; // null = all leagues (no filter), else an array of league names
+
+const CNO_LEAGUE_SPORT = {
+  NBA: 'basketball', NCAAB: 'basketball', NCAAW: 'basketball', WNBA: 'basketball',
+  NFL: 'football', NCAAF: 'football',
+  MLB: 'baseball',
+  NHL: 'hockey'
+};
+function cnoLeagueSport(league) {
+  return CNO_LEAGUE_SPORT[league.toUpperCase()] || 'soccer'; // the remaining leagues on CNO are soccer
+}
+
+function getLeagueDropdown() { return document.querySelector('[id$="DropDownListLeague"]'); }
+function getSportDropdown() { return document.querySelector('[id$="DropDownListSport"]'); }
+
+function isAllValue(el) {
+  if (!el) return true;
+  const v = (el.value || '').toLowerCase();
+  return !v || v === 'all' || v === '-1' || v === '0';
+}
+
+function getMultiLeagueChoices() {
+  const leagueEl = getLeagueDropdown();
+  if (!leagueEl) return [];
+  const sportEl = getSportDropdown();
+  const sport = !isAllValue(sportEl) ? (sportEl.options[sportEl.selectedIndex].text || '').trim().toLowerCase() : '';
+  return Array.from(leagueEl.options)
+    .filter(o => !isAllValue({ value: o.value }) && o.text.trim().toLowerCase() !== 'all')
+    .map(o => o.text.replace(/\s+/g, ' ').trim())
+    .filter(name => !sport || cnoLeagueSport(name) === sport);
+}
+
+function setMultiLeagueSelection(list) {
+  cnoMultiLeagueSelection = (list && list.length) ? list.slice() : null;
+  syncMultiLeaguePicker();
+  processMultiLeagueFilter();
+}
+
+function createMultiLeagueRow() {
+  const row = document.createElement('div');
+  row.className = 'cno-field';
+  row.id = 'cno-multi-league';
+  row.style.cssText = 'margin-top: 4px; position: relative;';
+
+  const label = document.createElement('label');
+  label.textContent = 'Refine: Leagues';
+  label.title = 'Shows only the leagues you pick. This hides rows CNO already returned; it does not change what CNO searches, so use a large Result Count (e.g. 300) to make sure the leagues you want are in the results. Set League to "All" to use it.';
+  label.appendChild(createRowsFilterHint());
+  row.appendChild(label);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'cno-ml-toggle';
+  toggle.style.cssText = `
+    display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%;
+    padding: 5px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;
+    font-size: 0.82rem; color: #0f172a; cursor: pointer; text-align: left;
+  `;
+  toggle.innerHTML = '<span class="cno-ml-summary" style="flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span><span style="color:#64748b;">▾</span>';
+  row.appendChild(toggle);
+
+  const panel = document.createElement('div');
+  panel.className = 'cno-ml-panel';
+  panel.style.cssText = `
+    display: none; position: fixed; z-index: 1000001;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;
+    box-shadow: 0 10px 24px rgba(15,23,42,0.16); overflow: hidden; min-width: 200px;
+  `;
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex; gap:6px; padding:7px 8px; background:#f8fafc; border-bottom:1px solid #e2e8f0;';
+  const mkAction = (text, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.style.cssText = 'flex:1; padding:4px 6px; font-size:0.75rem; font-weight:700; color:#0369a1; background:#ffffff; border:1px solid #cbd5e1; border-radius:4px; cursor:pointer;';
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+    return b;
+  };
+  actions.appendChild(mkAction('Select all', () => setMultiLeagueSelection(null)));
+  actions.appendChild(mkAction('Select none', () => { cnoMultiLeagueSelection = []; syncMultiLeaguePicker(); processMultiLeagueFilter(); }));
+  const list = document.createElement('div');
+  list.className = 'cno-ml-list';
+  list.style.cssText = 'max-height: 240px; overflow-y: auto; overscroll-behavior: contain; padding: 4px;'; // scrolling past the end doesn't scroll the page
+  const hint = document.createElement('div');
+  hint.textContent = 'Applies right away. None selected = all leagues.';
+  hint.style.cssText = 'padding:6px 10px; font-size:0.7rem; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0;';
+  panel.appendChild(actions);
+  panel.appendChild(list);
+  panel.appendChild(hint);
+  row.appendChild(panel);
+
+  const place = () => {
+    const r = toggle.getBoundingClientRect();
+    const width = Math.max(r.width, 200);
+    panel.style.width = `${width}px`;
+    panel.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - width - 8))}px`;
+    const below = window.innerHeight - r.bottom;
+    if (below < 300 && r.top > below) { panel.style.top = ''; panel.style.bottom = `${window.innerHeight - r.top + 3}px`; }
+    else { panel.style.bottom = ''; panel.style.top = `${r.bottom + 3}px`; }
+  };
+  const close = () => { panel.style.display = 'none'; };
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (toggle.disabled) return;
+    if (panel.style.display === 'none') { buildMultiLeagueList(); panel.style.display = 'block'; place(); }
+    else close();
+  });
+  panel.addEventListener('click', (e) => e.stopPropagation());
+  panel.addEventListener('wheel', (e) => { if (!e.target.closest('.cno-ml-list')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('click', (e) => { if (!row.contains(e.target)) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  window.addEventListener('scroll', (e) => { if (panel.style.display !== 'none' && !panel.contains(e.target)) close(); }, true);
+
+  setTimeout(syncMultiLeaguePicker, 0);
+  return row;
+}
+
+function buildMultiLeagueList() {
+  const list = document.querySelector('#cno-multi-league .cno-ml-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const chosen = cnoMultiLeagueSelection ? new Set(cnoMultiLeagueSelection.map(x => x.toLowerCase())) : null;
+  getMultiLeagueChoices().forEach(name => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex; align-items:center; gap:7px; padding:4px 6px; border-radius:4px; cursor:pointer; font-size:0.8rem; font-weight:500; color:#0f172a; margin:0;';
+    lbl.addEventListener('mouseover', () => lbl.style.background = '#f0f9ff');
+    lbl.addEventListener('mouseout', () => lbl.style.background = 'none');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = name;
+    cb.checked = !chosen || chosen.has(name.toLowerCase());
+    cb.style.cssText = 'width:14px; height:14px; margin:0; accent-color:#0284c7; cursor:pointer;';
+    cb.addEventListener('change', () => {
+      const all = Array.from(list.querySelectorAll('input[type="checkbox"]'));
+      const picked = all.filter(c => c.checked).map(c => c.value);
+      cnoMultiLeagueSelection = picked.length === all.length ? null : picked;
+      syncMultiLeaguePicker(false);
+      processMultiLeagueFilter();
+    });
+    const span = document.createElement('span');
+    span.textContent = name;
+    lbl.appendChild(cb);
+    lbl.appendChild(span);
+    list.appendChild(lbl);
+  });
+}
+
+function syncMultiLeaguePicker(rebuildList = true) {
+  const row = document.getElementById('cno-multi-league');
+  if (!row) return;
+  const toggle = row.querySelector('.cno-ml-toggle');
+  const summary = row.querySelector('.cno-ml-summary');
+  const enabled = isAllValue(getLeagueDropdown());
+  toggle.disabled = !enabled;
+  row.style.opacity = enabled ? '1' : '0.5';
+  toggle.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  toggle.title = enabled ? '' : 'Set League to "All" to pick several leagues';
+  const sel = cnoMultiLeagueSelection;
+  const text = !sel ? 'All leagues' : sel.length === 0 ? 'None selected (shows all)' : sel.length <= 3 ? sel.join(', ') : `${sel.length} leagues`;
+  if (summary.textContent !== text) summary.textContent = text;
+  const panel = row.querySelector('.cno-ml-panel');
+  if (rebuildList && panel && panel.style.display !== 'none') buildMultiLeagueList();
+}
+
+function processMultiLeagueFilter() {
+  syncMultiLeaguePicker(false);
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const active = !!(table && isCnoListPage() && cnoMultiLeagueSelection && cnoMultiLeagueSelection.length &&
+    document.getElementById('cno-multi-league') && isAllValue(getLeagueDropdown()));
+  if (!active) {
+    document.querySelectorAll('.cno-league-hidden').forEach(el => el.classList.remove('cno-league-hidden'));
+    return;
+  }
+  const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const leagueIdx = heads.indexOf('league');
+  if (leagueIdx === -1) return;
+  const keep = new Set(cnoMultiLeagueSelection.map(x => x.toLowerCase()));
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    const cell = row.children[leagueIdx];
+    if (!cell) return;
+    const hide = !keep.has(getCleanCellText(cell).toLowerCase());
+    row.classList.toggle('cno-league-hidden', hide);
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-league-hidden', hide);
+  });
+}
+
+// ====================================================
+// "N ROWS HIDDEN" NOTE above the table, for every filter that hides rows
+// ====================================================
+
+function processHiddenRowsNote() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const banner = document.getElementById('cno-injury-refresh-banner');
+  let note = document.getElementById('cno-injured-hidden-note');
+  if (!table || !banner) { if (note) note.remove(); return; }
+
+  const rows = Array.from(table.querySelectorAll('tbody tr:not(.footable-row-detail)'));
+  const reasons = [
+    ['cno-injured-hidden', 'injured players', !!(document.getElementById('cno-exclude-injured-cb') || {}).checked],
+    ['cno-under-hidden', 'player unders', !!(document.getElementById('cno-exclude-player-unders-cb') || {}).checked],
+    ['cno-league-hidden', 'other leagues', !!(cnoMultiLeagueSelection && cnoMultiLeagueSelection.length)]
+  ];
+  const parts = [];
+  let total = 0;
+  const counted = new Set();
+  reasons.forEach(([cls, label, on]) => {
+    if (!on) return;
+    const n = rows.filter(r => r.classList.contains(cls)).length;
+    rows.forEach(r => { if (r.classList.contains(cls)) counted.add(r); });
+    parts.push(`${label} (${n})`);
+  });
+  total = counted.size;
+
+  if (!parts.length) { if (note) note.remove(); return; }
+  if (!note || note.parentNode !== banner) {
+    if (note) note.remove();
+    note = document.createElement('span');
+    note.id = 'cno-injured-hidden-note';
+    note.style.cssText = 'margin-right: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 500; color: #94a3b8;';
+    banner.insertBefore(note, banner.firstChild);
+  }
+  const text = `${total} row${total === 1 ? '' : 's'} hidden: ${parts.join(', ')}`;
+  if (note.dataset.text !== text) {
+    note.dataset.text = text;
+    note.innerHTML = '';
+    const icon = createRowsFilterHint();
+    icon.style.marginLeft = '0';
+    note.appendChild(icon);
+    note.appendChild(document.createTextNode(text));
+  }
 }

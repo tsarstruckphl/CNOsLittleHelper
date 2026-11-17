@@ -8,7 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     enableApRankings: true,
     hideShareLinkPane: false,
     hideReadmePane: false,
-    hideUnusedExtraColumn: false
+    hideUnusedExtraColumn: false,
+    hideUnwantedGameBooks: false,
+    modernizeGameTable: true,
+    modernizeMainTables: true,
+    mainTableDensity: 'standard'
   }, (items) => {
     document.getElementById('enableFilterModernization').checked = items.enableFilterModernization;
     document.getElementById('enablePctBadges').checked = items.enablePctBadges;
@@ -18,6 +22,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('hideShareLinkPane').checked = items.hideShareLinkPane;
     document.getElementById('hideReadmePane').checked = items.hideReadmePane;
     document.getElementById('hideUnusedExtraColumn').checked = items.hideUnusedExtraColumn;
+    document.getElementById('hideUnwantedGameBooks').checked = items.hideUnwantedGameBooks;
+    document.getElementById('modernizeGameTable').checked = items.modernizeGameTable;
+    document.getElementById('modernizeMainTables').checked = items.modernizeMainTables;
+    document.getElementById('mainTableDensity').value = items.mainTableDensity || 'standard';
+    syncDensityEnabled();
   });
 
   // Bind change listeners to auto-save settings
@@ -25,6 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
   checkboxes.forEach(cb => {
     cb.addEventListener('change', saveOptions);
   });
+
+  // Row spacing: only usable while "Restyle Results Tables" is on
+  const densitySelect = document.getElementById('mainTableDensity');
+  densitySelect.addEventListener('click', (e) => e.stopPropagation()); // it sits inside the setting's <label>
+  densitySelect.addEventListener('change', saveOptions);
+  document.getElementById('modernizeMainTables').addEventListener('change', syncDensityEnabled);
 
   // Check GitHub for a newer release every time the options page opens
   checkForUpdates();
@@ -36,6 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('viewRoadMap').addEventListener('click', () => {
     openTextFileModal('🗺️ Roadmap', 'CNOsLittleHelperRoadMap.txt');
+  });
+
+  document.getElementById('specifyShownBooks').addEventListener('click', (e) => {
+    // The link sits inside the setting's <label>; don't let the click toggle the checkbox
+    e.preventDefault();
+    e.stopPropagation();
+    openShownBooksModal();
   });
 
   document.getElementById('requestFeature').addEventListener('click', () => openFeedbackEmail('feature'));
@@ -51,7 +73,11 @@ function saveOptions() {
     enableApRankings: document.getElementById('enableApRankings').checked,
     hideShareLinkPane: document.getElementById('hideShareLinkPane').checked,
     hideReadmePane: document.getElementById('hideReadmePane').checked,
-    hideUnusedExtraColumn: document.getElementById('hideUnusedExtraColumn').checked
+    hideUnusedExtraColumn: document.getElementById('hideUnusedExtraColumn').checked,
+    hideUnwantedGameBooks: document.getElementById('hideUnwantedGameBooks').checked,
+    modernizeGameTable: document.getElementById('modernizeGameTable').checked,
+    modernizeMainTables: document.getElementById('modernizeMainTables').checked,
+    mainTableDensity: document.getElementById('mainTableDensity').value
   };
 
   chrome.storage.local.set(settings, () => {
@@ -126,8 +152,14 @@ function checkForUpdates() {
   const githubLink = document.getElementById('cno-github-link');
   const currentVersion = chrome.runtime.getManifest().version;
 
-  statusText.textContent = 'Checking for updates...';
   instructions.style.display = 'none';
+
+  if (typeof CNO_IS_FIREFOX_BUILD !== 'undefined' && CNO_IS_FIREFOX_BUILD) {
+    statusText.textContent = `Installed: v${currentVersion}. Updates are delivered automatically through Firefox Add-ons.`;
+    return;
+  }
+
+  statusText.textContent = 'Checking for updates...';
 
   chrome.runtime.sendMessage({ type: 'cno-check-update' }, (result) => {
     if (chrome.runtime.lastError || !result || !result.ok) {
@@ -164,4 +196,125 @@ const FEEDBACK_FORM_URLS = {
 
 function openFeedbackEmail(kind) {
   window.open(FEEDBACK_FORM_URLS[kind] || FEEDBACK_FORM_URLS.feature, '_blank', 'noopener,noreferrer');
+}
+
+// ====================================================
+// "SPECIFY SHOWN BOOKS" POPUP (game odds tables)
+// ====================================================
+
+function openShownBooksModal() {
+  const existing = document.getElementById('cno-books-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'cno-books-modal';
+  modal.className = 'cno-modal';
+
+  const content = document.createElement('div');
+  content.className = 'cno-modal-content';
+  content.style.width = '440px';
+
+  const header = document.createElement('div');
+  header.className = 'cno-modal-header';
+  header.innerHTML = `<h3>📚 Shown Books on Game Pages</h3><button class="cno-modal-close" type="button">✕</button>`;
+
+  const toolbar = document.createElement('div');
+  toolbar.style.cssText = 'display:flex; gap:6px; padding:10px 16px; border-bottom:1px solid #e2e8f0; background:#ffffff;';
+
+  const body = document.createElement('div');
+  body.className = 'cno-modal-body';
+  body.style.cssText = 'font-family: inherit; white-space: normal; padding: 6px 10px 10px;';
+  body.textContent = 'Loading books...';
+
+  const footer = document.createElement('div');
+  footer.style.cssText = 'padding:8px 16px; font-size:0.76rem; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0;';
+  footer.textContent = 'Unchecked books are hidden on game pages when "Hide unwanted books" is on. Changes save automatically.';
+
+  content.appendChild(header);
+  content.appendChild(toolbar);
+  content.appendChild(body);
+  content.appendChild(footer);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  const closeModal = () => { modal.remove(); window.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') closeModal(); };
+  header.querySelector('.cno-modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  window.addEventListener('keydown', onKey);
+
+  loadBooksList((books) => {
+    if (!books.length) {
+      body.textContent = "Couldn't load the book list right now. Please try again later.";
+      return;
+    }
+
+    chrome.storage.local.get({ [CNO_GAME_BOOK_VIS_KEY]: {} }, (data) => {
+      let visibility = data[CNO_GAME_BOOK_VIS_KEY] || {};
+      const save = () => {
+        chrome.storage.local.set({ [CNO_GAME_BOOK_VIS_KEY]: visibility }, () => {
+          const status = document.getElementById('status');
+          if (status) {
+            status.textContent = 'Settings saved!';
+            setTimeout(() => { status.textContent = ''; }, 1500);
+          }
+        });
+      };
+
+      body.innerHTML = '';
+      const checks = [];
+      books.forEach(book => {
+        const row = document.createElement('label');
+        row.style.cssText = 'display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:5px; cursor:pointer; font-size:0.88rem; color:#0f172a;';
+        row.addEventListener('mouseover', () => row.style.background = '#f0f9ff');
+        row.addEventListener('mouseout', () => row.style.background = 'none');
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = isBookShown(book, visibility);
+        cb.style.cssText = 'width:15px; height:15px; margin:0; accent-color:#0284c7; cursor:pointer;';
+        cb.addEventListener('change', () => { visibility[book.shortCode] = cb.checked; save(); });
+
+        const name = document.createElement('span');
+        name.textContent = book.fullName;
+        name.style.flex = '1';
+        const code = document.createElement('span');
+        code.textContent = book.shortCode;
+        code.style.cssText = 'font-size:0.72rem; color:#94a3b8; font-weight:600;';
+
+        row.appendChild(cb);
+        row.appendChild(name);
+        row.appendChild(code);
+        body.appendChild(row);
+        checks.push({ cb, book });
+      });
+
+      const makeBtn = (text, onClick) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = text;
+        b.style.cssText = 'flex:1; padding:5px 8px; font-size:0.78rem; font-weight:700; color:#0369a1; background:#ffffff; border:1px solid #cbd5e1; border-radius:5px; cursor:pointer;';
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      toolbar.appendChild(makeBtn('Select all', () => {
+        checks.forEach(({ cb, book }) => { cb.checked = true; visibility[book.shortCode] = true; });
+        save();
+      }));
+      toolbar.appendChild(makeBtn('Select none', () => {
+        checks.forEach(({ cb, book }) => { cb.checked = false; visibility[book.shortCode] = false; });
+        save();
+      }));
+      toolbar.appendChild(makeBtn('Reset to defaults', () => {
+        visibility = {};
+        checks.forEach(({ cb, book }) => { cb.checked = book.showByDefault; });
+        save();
+      }));
+    });
+  });
+}
+
+function syncDensityEnabled() {
+  const on = document.getElementById('modernizeMainTables').checked;
+  document.getElementById('mainTableDensity').disabled = !on;
 }
