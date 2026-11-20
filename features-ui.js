@@ -137,6 +137,12 @@ function updateDeviggerLink(popup) {
 
   if (!fairOdds || !finalOdds) return;
 
+  // Positive EV page: a profit boost typed into the popup's "Add profit boost" box (filter-ui.js)
+  if (!boostVal && typeof cnoCalcBoostPct === 'function') {
+    const extra = cnoCalcBoostPct(popup);
+    if (extra > 0) boostVal = String(extra);
+  }
+
   const popupText = (suffix) => {
     const el = activeTab.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`) || popup.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`);
     return el ? getOwnText(el).trim() : '';
@@ -172,9 +178,13 @@ function updateDeviggerLink(popup) {
     if (brBeforeThat && brBeforeThat.tagName === 'BR') brBefore.style.display = 'none';
   }
 
-  const existingLink = linkContainer.querySelector('a.cno-devigger-btn');
-  if (existingLink && existingLink.getAttribute('href') === deviggerUrl) return;
-  linkContainer.innerHTML = `<a href="${deviggerUrl}" target="_blank" rel="noopener" class="cno-devigger-btn">Open in Devigger <span aria-hidden="true">↗</span></a>`;
+  const existingLink = linkContainer.querySelector('a.cno-devigger-btn:not(.cno-calc-sharp-btn)');
+  if (!existingLink || existingLink.getAttribute('href') !== deviggerUrl) {
+    linkContainer.innerHTML = `<a href="${deviggerUrl}" target="_blank" rel="noopener" class="cno-devigger-btn">${cnoIconSvg('devig')} Open in Devigger <span aria-hidden="true">↗</span></a>`;
+  }
+  // "Custom Sharp EV" to its right (filter-ui.js), when that row has a sharp-book set
+  if (typeof cnoSyncCalcSharpBtn === 'function') cnoSyncCalcSharpBtn(linkContainer);
+  if (typeof cnoSyncCalcBoost === 'function') cnoSyncCalcBoost(linkContainer, fairOdds, finalOdds);
 }
 
 function injectModalBadges() {
@@ -309,7 +319,7 @@ function addGameDeviggerCheckbox() {
   const deepLinksLabel = document.querySelector('label[for="ContentPlaceHolderMain_ContentPlaceHolderRight_CheckBoxDeepLinkOddsScreen"]');
   if (!deepLinksInput || !deepLinksLabel) return;
 
-  const isChecked = localStorage.getItem('cno_enable_rightclick_devig') !== 'false';
+  const isChecked = userSettings.enableRightClickDevig !== false;
 
   const wrapper = document.createElement('span');
   wrapper.id = 'cno-wrap-rightclick-devig';
@@ -322,7 +332,7 @@ function addGameDeviggerCheckbox() {
   checkbox.style.cssText = 'margin: 0 3px 0 0; vertical-align: middle; cursor: pointer;';
 
   checkbox.addEventListener('change', () => {
-    localStorage.setItem('cno_enable_rightclick_devig', checkbox.checked.toString());
+    cnoSetUserSetting('enableRightClickDevig', checkbox.checked);
   });
 
   const label = document.createElement('label');
@@ -359,7 +369,7 @@ function setupGameRightClickDevigger() {
   targetTable.dataset.hasRightClick = "true";
 
   targetTable.addEventListener('contextmenu', (e) => {
-    const isEnabled = localStorage.getItem('cno_enable_rightclick_devig') !== 'false';
+    const isEnabled = userSettings.enableRightClickDevig !== false;
     if (!isEnabled) return;
 
     const targetCell = e.target.closest('td');
@@ -1526,7 +1536,7 @@ function ensureGameTableToolbar(table) {
   const classic = document.createElement('button');
   classic.type = 'button';
   classic.className = 'cno-gt-switch';
-  classic.textContent = '📜 Show classic table';
+  cnoSetIconLabel(classic, 'classic', 'Show classic table');
   classic.title = 'Show the table the way CNO draws it (same as turning off "Restyle Game Odds Table" in the options)';
   classic.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); setGameTableRestyle(false); });
   inner.appendChild(classic);
@@ -1821,7 +1831,7 @@ function ensureEnhancedTableButton(table) {
   btn.type = 'button';
   btn.id = 'cno-gt-enhanced-btn';
   btn.className = 'cno-gt-switch';
-  btn.textContent = '⚡ Show enhanced table';
+  cnoSetIconLabel(btn, 'enhanced', 'Show enhanced table');
   btn.title = 'Turn the restyled table back on (same as "Restyle Game Odds Table" in the options)';
   btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); btn.remove(); setGameTableRestyle(true); });
   host.parentNode.insertBefore(btn, host);

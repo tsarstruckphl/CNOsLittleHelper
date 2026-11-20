@@ -1,3 +1,21 @@
+1.2.3
+FEATURE ADDITIONS:
+--Custom Sharp Book Devigging: pick the books you trust as sharp for each sport or league and market type (all / player / non-player), averaged or weighted, with minimum liquidity for exchanges and your choice of devig method (default Worst-case)
+--"Sharp FV" button beside Calc button: reads the game page to provide EV based on your custom sharp book settings
+--"Custom Sharp EV" button next to "Open in Devigger" in the Calc popup
+--Backup & Restore (Settings page): save and restore Little Helper settings, CNO settings, saved filters, and custom sharp books (.cnolh/XML files), with a warning before removing filters that aren't in the backup
+--Import & Export (Settings page, plus links in the Apply Filters popup and the sharp books page): share chosen saved filters and sharp book sets without removing your own
+--Positive EV page: "Add profit boost" in the Calc popup adds a "Boosted Odds" line and updates the popup's EV%, QK and Kelly to the boosted values (using CNO's Fair Odds)
+--"Exclude Player Unders by Default" option on the Settings page
+-- Various design and UI improvements throughout
+
+BUG FIXES:
+--Fixed "Please select a Boost Type option" on first load of the Odds Boost page
+--Fixed alternating row colors when rows are hidden by Exclude/Refine filters
+--Fixed the filter panel sometimes showing part of the old layout below the new one
+--Classic View, right-click devig, and Exclude Player Unders choices are now kept by the extension (moved automatically) so they can be backed up
+--Clear Filters now also removes old filter values from the page address, so a refresh doesn't bring them back
+
 1.2.2
 FEATURE ADDITIONS:
 --Results tables restyle (option, on by default; "Show classic table" to switch back): narrower odds columns with liquidity/price under the odds, compact date and sport/league, "FV Devig" link under the Calc button on hover (replaces right-click), and a Row spacing setting

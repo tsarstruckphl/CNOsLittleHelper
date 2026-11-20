@@ -94,6 +94,24 @@
       cursor: pointer;
       margin-top: 2px;
     }
+    .setting-button {
+      flex: 0 0 auto;
+      align-self: center;
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #0284c7;
+      background: #0284c7;
+      color: #ffffff;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .setting-button:hover {
+      background: #0369a1;
+      border-color: #0369a1;
+    }
     .setting-label {
       display: flex;
       flex-direction: column;
@@ -285,34 +303,10 @@
       </label>
 
       <label class="setting-item">
-        <input type="checkbox" id="hideShareLinkPane">
-        <div class="setting-label">
-          <span class="setting-title">Hide "Share Link" Pane</span>
-          <span class="setting-desc">Hides the Share Link section below the filters on the tool pages.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="hideReadmePane">
-        <div class="setting-label">
-          <span class="setting-title">Hide "Readme" Pane</span>
-          <span class="setting-desc">Hides the Readme section below the filters on the tool pages.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
-        <input type="checkbox" id="hideUnusedExtraColumn">
-        <div class="setting-label">
-          <span class="setting-title">Remove "Extra" Column When Unused</span>
-          <span class="setting-desc">Hides the Extra column in the results table when none of the rows have anything in it.</span>
-        </div>
-      </label>
-
-      <label class="setting-item">
         <input type="checkbox" id="modernizeMainTables">
         <div class="setting-label">
           <span class="setting-title">Restyle Results Tables</span>
-          <span class="setting-desc">On the tool pages (Positive EV, Odds Boost, Low Hold, etc.): narrower odds columns (liquidity and price shown under the odds), compact date and sport/league, and an "FV Devig" link under the Calc button. Turn off to use CNO's normal tables.</span>
+          <span class="setting-desc">On the tool pages (Positive EV, Odds Boost, Low Hold, etc.): narrower odds columns (liquidity and price shown under the odds), compact date and sport/league, and "FV Devig" (plus "Sharp FV", if set up) buttons beside the Calc button. Turn off to use CNO's normal tables.</span>
           <span class="setting-sub">
             <label for="mainTableDensity">Row spacing</label>
             <select id="mainTableDensity">
@@ -339,6 +333,42 @@
           <span class="setting-desc">Removes the columns for books you've unchecked from the odds table on game pages. <a id="specifyShownBooks" href="#" style="color:#0284c7; font-weight:600; text-decoration:none;">Specify shown books</a></span>
         </div>
       </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideShareLinkPane">
+        <div class="setting-label">
+          <span class="setting-title">Hide "Share Link" Pane</span>
+          <span class="setting-desc">Hides the Share Link section below the filters on the tool pages.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideReadmePane">
+        <div class="setting-label">
+          <span class="setting-title">Hide "Readme" Pane</span>
+          <span class="setting-desc">Hides the Readme section below the filters on the tool pages.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
+        <input type="checkbox" id="hideUnusedExtraColumn">
+        <div class="setting-label">
+          <span class="setting-title">Remove "Extra" Column When Unused</span>
+          <span class="setting-desc">Hides the Extra column in the results table when none of the rows have anything in it.</span>
+        </div>
+      </label>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-group-title">Devigging</div>
+      <label class="setting-item">
+        <input type="checkbox" id="customSharpDevig">
+        <div class="setting-label" style="flex:1 1 auto;">
+          <span class="setting-title">Custom Sharp Book Devigging</span>
+          <span class="setting-desc">Work out fair value from the books you trust as sharp, averaged or weighted, with separate setups for each sport or league and market type.</span>
+        </div>
+        <button type="button" id="setupSharpBooks" class="setting-button">Set Up Sharp Books</button>
+      </label>
     </div>
 
     <div class="setting-group">
@@ -352,10 +382,10 @@
       </label>
 
       <label class="setting-item">
-        <input type="checkbox" id="enableMlbWeather">
+        <input type="checkbox" id="excludePlayerUndersDefault">
         <div class="setting-label">
-          <span class="setting-title">MLB Weather Badges</span>
-          <span class="setting-desc">Displays rain/delay icons on MLB games matching Rotowire's forecasts.</span>
+          <span class="setting-title">Exclude Player Unders by Default</span>
+          <span class="setting-desc">Starts "Exclude Player Unders" checked on the tool pages. Changing it on a page still sticks for that page.</span>
         </div>
       </label>
 
@@ -368,12 +398,40 @@
       </label>
 
       <label class="setting-item">
+        <input type="checkbox" id="enableMlbWeather">
+        <div class="setting-label">
+          <span class="setting-title">MLB Weather Badges</span>
+          <span class="setting-desc">Displays rain/delay icons on MLB games matching Rotowire's forecasts.</span>
+        </div>
+      </label>
+
+      <label class="setting-item">
         <input type="checkbox" id="enablePctBadges">
         <div class="setting-label">
-          <span class="setting-title">Odds-to-Percentage Badges</span>
+          <span class="setting-title">Show Odds-to-Percentage Conversion on Calc Page</span>
           <span class="setting-desc">Shows probability % badges next to American odds in the calculator popups for exchange sportsbooks (Novig, Kalshi, ProphetX).</span>
         </div>
       </label>
+    </div>
+
+
+
+    <div class="setting-group">
+      <div class="setting-group-title">Backup &amp; Sharing</div>
+      <div class="setting-item" style="cursor:default;">
+        <div class="setting-label" style="flex:1 1 auto;">
+          <span class="setting-title">Backup &amp; Restore</span>
+          <span class="setting-desc">Save your Little Helper settings, CNO settings, saved filters and custom sharp books to a file, and restore them later.</span>
+        </div>
+        <button type="button" id="openBackup" class="setting-button">Backup &amp; Restore</button>
+      </div>
+      <div class="setting-item" style="cursor:default;">
+        <div class="setting-label" style="flex:1 1 auto;">
+          <span class="setting-title">Import &amp; Export</span>
+          <span class="setting-desc">Share saved filters and custom sharp books: pick which ones to export, or import ones someone sent you.</span>
+        </div>
+        <button type="button" id="openShare" class="setting-button">Import &amp; Export</button>
+      </div>
     </div>
 
     <script src="config.js"></script>

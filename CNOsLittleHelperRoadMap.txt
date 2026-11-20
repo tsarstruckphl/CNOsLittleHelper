@@ -1,14 +1,11 @@
 Planned Improvements
 --------------------
 
-(+) Ability to backup and import settings/saved filters 
 (+) Ability to switch default devigger to hedgecalc instead of CNO
 (+) MLB weather filter 
+(+) Ability to backup and import settings/saved filters 
 (+) Ability to export and import CNO settings (not extension settings)
-(+) Ability to multi-select bets to send to devigger, create multi-bet QR codes, and 
-(+) Branched Firefox version?
-(+) Game Odds: Injury badges on players
-
+(+) Ability to multi-select bets to send to devigger, create multi-bet QR codes, and potentially show EV%/FV, add boost
 
 Possible Improvements
 ---------------------

@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     hideUnwantedGameBooks: false,
     modernizeGameTable: true,
     modernizeMainTables: true,
-    mainTableDensity: 'standard'
+    mainTableDensity: 'standard',
+    customSharpDevig: false,
+    excludePlayerUndersDefault: false
   }, (items) => {
     document.getElementById('enableFilterModernization').checked = items.enableFilterModernization;
     document.getElementById('enablePctBadges').checked = items.enablePctBadges;
@@ -26,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modernizeGameTable').checked = items.modernizeGameTable;
     document.getElementById('modernizeMainTables').checked = items.modernizeMainTables;
     document.getElementById('mainTableDensity').value = items.mainTableDensity || 'standard';
+    document.getElementById('customSharpDevig').checked = items.customSharpDevig;
+    document.getElementById('excludePlayerUndersDefault').checked = items.excludePlayerUndersDefault;
     syncDensityEnabled();
   });
 
@@ -60,6 +64,17 @@ document.addEventListener('DOMContentLoaded', () => {
     openShownBooksModal();
   });
 
+  // Backup / restore and import / export open in their own tab
+  document.getElementById('openBackup').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('transfer.html') }));
+  document.getElementById('openShare').addEventListener('click', () => chrome.tabs.create({ url: chrome.runtime.getURL('transfer.html#share') }));
+
+  // Sharp books editor opens in its own tab (it's too big for a popup)
+  document.getElementById('setupSharpBooks').addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    chrome.tabs.create({ url: chrome.runtime.getURL('sharp-books.html') });
+  });
+
   document.getElementById('requestFeature').addEventListener('click', () => openFeedbackEmail('feature'));
   document.getElementById('reportBug').addEventListener('click', () => openFeedbackEmail('bug'));
 });
@@ -77,7 +92,9 @@ function saveOptions() {
     hideUnwantedGameBooks: document.getElementById('hideUnwantedGameBooks').checked,
     modernizeGameTable: document.getElementById('modernizeGameTable').checked,
     modernizeMainTables: document.getElementById('modernizeMainTables').checked,
-    mainTableDensity: document.getElementById('mainTableDensity').value
+    mainTableDensity: document.getElementById('mainTableDensity').value,
+    customSharpDevig: document.getElementById('customSharpDevig').checked,
+    excludePlayerUndersDefault: document.getElementById('excludePlayerUndersDefault').checked
   };
 
   chrome.storage.local.set(settings, () => {

@@ -384,10 +384,13 @@ html.cno-modern-ui #cno-title-row {
 
 html.cno-modern-ui #cno-title-row > h1 {
   margin: 0;
-  font-size: 1.45rem;
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-stretch: normal;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  word-spacing: 0.06em;
   color: #0f172a;
 }
 
@@ -736,7 +739,7 @@ table.lh-paired tr.lh-group-end > td {
   color: #64748b;
 }
 
-/* "FV Devig" under the Calc button, on hover */
+/* "FV Devig" and "Sharp FV" to the right of the Calc button, on hover */
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.lh-calc.lh-has-fv {
   position: relative;
 }
@@ -745,46 +748,63 @@ table.lh-paired tr.lh-group-end > td {
   display: none;
   position: absolute;
   z-index: 5;
-  flex-direction: column;
+  transform: translateY(-50%);
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 3px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  border-radius: 0 7px 7px 0;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.14);
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.lh-calc.lh-has-fv:hover .cno-fv-pop {
   display: flex;
 }
 
-
-
+/* Same size and shape as the Calc button */
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link {
-  display: block;
-  padding: 2px 6px 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: var(--lh-calc-h, 24px);
+  padding: 0 9px;
+  border-radius: 5px;
   background: #e0f2fe;
   border: 1px solid #7dd3fc;
-  font: 600 0.68rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.3;
+  font: 600 0.72rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1;
   color: #075985 !important;
-  text-align: center;
   text-decoration: none !important;
   white-space: nowrap;
-  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.12);
-}
-
-#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:first-child {
-  border-radius: 5px 5px 0 0;
-}
-
-#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:last-child {
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
-}
-
-#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link + a.cno-fv-link {
-  border-top: 1px solid #bae6fd;
+  cursor: pointer;
 }
 
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link:hover {
   background: #bae6fd;
   color: #0c4a6e !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link.cno-sharp-link {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #ffffff !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link.cno-sharp-link:hover {
+  background: #115e59;
+  border-color: #115e59;
+  color: #ffffff !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 a.cno-fv-link svg {
+  flex: 0 0 auto;
+  display: block;
 }
 
 /* Sport folded into League: the Sport column is hidden and shown as a small line above the League */
@@ -871,3 +891,176 @@ table.lh-paired tr.lh-group-end > td {
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th.lh-fair {
   min-width: 92px;
 }
+
+/* EV% / HV% / ROI% and EV Hit%: centered */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th.lh-center,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main td.lh-center {
+  text-align: center;
+}
+
+/* Shortened price headers (L.H. Odds, H.B. Odds, P.B. Odds): the original text stays in the page
+   (hidden with font-size 0) and the short label is drawn in its place */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th[data-lh-abbr] {
+  font-size: 0 !important;
+}
+
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.lh-main th[data-lh-abbr]::after {
+  content: attr(data-lh-abbr);
+  font-size: var(--lh-th-fs, 13px);
+}
+
+/* Sharp FV popup (opens beside the row's Calc button) */
+.cno-sharp-popup {
+  position: absolute;
+  z-index: 1000001;
+  width: 420px;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  padding: 10px 12px 9px;
+  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0f172a;
+  text-align: left;
+}
+.cno-sharp-head { display: flex; align-items: center; gap: 7px; }
+.cno-sharp-title { font-weight: 700; font-size: 14px; }
+.cno-sharp-tag { font-size: 11px; font-weight: 600; color: #0369a1; background: #e0f2fe; border-radius: 4px; padding: 1px 6px; }
+.cno-sharp-spacer { flex: 1; }
+.cno-sharp-iconbtn {
+  border: none; background: none; cursor: pointer; color: #64748b; font-size: 15px; line-height: 1;
+  padding: 3px 5px; border-radius: 4px;
+}
+.cno-sharp-iconbtn:hover { background: #f1f5f9; color: #0f172a; }
+.cno-sharp-bet { font-size: 12px; color: #64748b; margin: 2px 0 8px; }
+.cno-sharp-loading { color: #64748b; font-size: 12.5px; padding: 14px 0; text-align: center; }
+.cno-sharp-error { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 8px; }
+.cno-sharp-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
+.cno-sharp-tile { background: #f1f5f9; border-radius: 7px; padding: 6px 8px; }
+.cno-sharp-tile-label { font-size: 11px; color: #64748b; }
+.cno-sharp-tile-value { font-size: 17px; font-weight: 700; }
+.cno-sharp-tile-value.cno-pos { color: #047857; }
+.cno-sharp-tile-value.cno-neg { color: #b91c1c; }
+.cno-sharp-tile-sub { font-size: 11px; color: #64748b; margin-top: 1px; }
+table.cno-sharp-books { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.cno-sharp-books th { font-size: 11px; font-weight: 600; color: #64748b; text-align: left; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
+table.cno-sharp-books td { padding: 4px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+table.cno-sharp-books .cno-r { text-align: right; }
+table.cno-sharp-books tr.cno-sharp-unused td { color: #94a3b8; }
+.cno-sharp-warn { color: #b45309; font-size: 11px; }
+.cno-sharp-sub { color: #94a3b8; font-size: 11px; }
+.cno-sharp-avg { display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-top: 7px; }
+.cno-sharp-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  font-size: 11px; color: #94a3b8; margin-top: 8px; padding-top: 7px; border-top: 1px solid #e2e8f0;
+}
+a.cno-sharp-open { color: #0284c7 !important; font-weight: 600; text-decoration: none !important; white-space: nowrap; }
+a.cno-sharp-open:hover { text-decoration: underline !important; }
+
+/* Sharp FV popup: the bet */
+.cno-sharp-betinfo { margin: 4px 0 9px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+.cno-sharp-event { font-size: 12px; color: #475569; }
+.cno-sharp-market { font-size: 11.5px; color: #94a3b8; margin-top: 1px; }
+.cno-sharp-betline { display: flex; align-items: center; gap: 6px; margin-top: 3px; flex-wrap: wrap; }
+.cno-sharp-betname { font-weight: 700; font-size: 13.5px; color: #0f172a; }
+a.cno-sharp-betname { color: #0369a1 !important; text-decoration: none !important; }
+a.cno-sharp-betname:hover { text-decoration: underline !important; }
+.cno-sharp-qr {
+  font: 700 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; letter-spacing: .02em;
+  color: #0284c7; background: #ffffff; border: 1px solid #7dd3fc; border-radius: 4px; padding: 2px 6px; cursor: pointer;
+}
+.cno-sharp-qr:hover { background: #e0f2fe; }
+.cno-sharp-odds { margin-left: auto; display: inline-flex; align-items: baseline; gap: 5px; }
+input.cno-sharp-oddsval {
+  width: 62px; box-sizing: border-box; text-align: right;
+  font: 700 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0284c7;
+  padding: 2px 5px; border: 1px solid #cbd5e1; border-radius: 5px; background: #f8fafc;
+}
+input.cno-sharp-oddsval:hover { border-color: #94a3b8; }
+input.cno-sharp-oddsval:focus { outline: none; border-color: #0284c7; background: #ffffff; box-shadow: 0 0 0 2px rgba(2, 132, 199, .15); }
+input.cno-sharp-oddsval.cno-bad { border-color: #ef4444; background: #fef2f2; }
+.cno-sharp-book { font-size: 11.5px; color: #64748b; }
+.cno-sharp-oddsnote { font-size: 11px; color: #64748b; margin-top: 3px; }
+.cno-sharp-oddsnote:empty { display: none; }
+.cno-sharp-oddsnote.cno-warn { color: #b45309; }
+.cno-sharp-boost { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #334155; font-weight: 600; margin: -2px 0 9px; cursor: default; }
+.cno-sharp-boost input {
+  width: 64px; font: inherit; font-weight: 400; padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 5px; background: #ffffff; color: #0f172a;
+}
+.cno-sharp-boost input:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, .15); }
+table.cno-sharp-books td.cno-sharp-fv { font-weight: 600; }
+.cno-sharp-betsize { display: flex; align-items: center; gap: 4px; }
+.cno-sharp-eye {
+  display: inline-flex; align-items: center; border: none; background: none; padding: 1px 2px; margin: 0;
+  color: #64748b; cursor: pointer; border-radius: 3px;
+}
+.cno-sharp-eye:hover { color: #0f172a; background: #e2e8f0; }
+
+/* Icons in "Open in Devigger" links and the toolbar buttons */
+a.cno-sharp-open { display: inline-flex; align-items: center; gap: 2px; }
+a.cno-devigger-btn svg { margin-right: 2px; }
+
+/* "Custom Sharp EV" next to "Open in Devigger" in the Calc popup (same teal as the table's Sharp FV) */
+a.cno-devigger-btn.cno-calc-sharp-btn {
+  margin-left: 8px;
+  background-color: #0f766e;
+  border-color: #115e59;
+}
+a.cno-devigger-btn.cno-calc-sharp-btn:hover {
+  background-color: #115e59;
+  box-shadow: 0 3px 6px rgba(15, 118, 110, 0.3);
+}
+
+/* Unedited odds under the odds box after an edit (click the odds to restore them) */
+.cno-sharp-oddsbox { position: relative; display: inline-block; }
+.cno-sharp-origodds {
+  position: absolute; right: 0; top: 100%; margin-top: 1px; white-space: nowrap;
+  font: 500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #94a3b8;
+}
+.cno-sharp-origodds[hidden] { display: none; }
+.cno-sharp-origodds-btn {
+  border: none; background: none; padding: 0; margin: 0; cursor: pointer;
+  font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #64748b;
+}
+.cno-sharp-origodds-btn:hover { color: #0284c7; text-decoration: underline; }
+.cno-sharp-betinfo.cno-edited { padding-bottom: 18px; }
+
+/* Restriped rows while some rows are hidden (overrides CNO's own row colors; a highlighted
+   row, like the game page's focused line, keeps its highlight) */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 > tbody > tr.lh-stripe-a:not([style*="fffcc0"]) {
+  background-color: #ffffff !important;
+}
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 > tbody > tr.lh-stripe-b:not([style*="fffcc0"]) {
+  background-color: #eff3fb !important;
+}
+
+/* Positive EV page: "Add profit boost" in CNO's Calc popup */
+.cno-calc-boost {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; margin: -2px 0 8px;
+  font: 600 0.95rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #334155;
+}
+.cno-calc-boost label { display: inline-flex; align-items: center; gap: 5px; cursor: default; }
+.cno-calc-boost-field { position: relative; display: inline-flex; align-items: center; }
+.cno-calc-boost input {
+  width: 76px; box-sizing: border-box; padding: 3px 22px 3px 7px; font: 400 0.95rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: 1px solid #cbd5e1; border-radius: 5px; background: #ffffff; color: #0f172a;
+  -moz-appearance: textfield;
+}
+.cno-calc-boost input::-webkit-outer-spin-button,
+.cno-calc-boost input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cno-calc-boost-clear {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  border: none; background: none; padding: 0 3px; cursor: pointer; line-height: 1;
+  font: 700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #94a3b8; border-radius: 3px;
+}
+.cno-calc-boost-clear:hover { color: #0f172a; background: #f1f5f9; }
+.cno-calc-boost-clear[hidden] { display: none; }
+.cno-calc-boost input:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, .15); }
+.cno-calc-boost-out { font-weight: 600; font-size: 0.8rem; }
+/* Values in CNO's Calc popup that include the boost */
+.cno-boosted-val, .cno-boosted-odds { color: #047857; }
+.cno-calc-boost-out:empty { display: none; }
+.cno-calc-boost-out.cno-pos { color: #047857; }
+.cno-calc-boost-out.cno-neg { color: #b91c1c; }
+.cno-calc-boost-out.cno-busy { color: #64748b; font-weight: 500; }

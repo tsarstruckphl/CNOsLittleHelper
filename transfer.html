@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Backup, Restore, Import &amp; Export - CNO's Little Helper</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f8fafc; color: #1e293b; margin: 0; padding: 24px; display: flex; justify-content: center; }
+    .container { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; max-width: 760px; width: 100%;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+    h1 { font-size: 1.25rem; color: #0284c7; margin: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+    h1 img { width: 28px; height: 28px; }
+    p.subtitle { font-size: .85rem; color: #64748b; margin: 0 0 16px; line-height: 1.45; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; }
+    .tabs button { border: none; background: none; padding: 8px 14px; font: inherit; font-size: .9rem; font-weight: 600; color: #64748b;
+      border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+    .tabs button.on { color: #0284c7; border-bottom-color: #0284c7; }
+    .panel[hidden] { display: none; }
+    .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+    .card h2 { font-size: .95rem; margin: 0 0 4px; color: #0f172a; }
+    .card .desc { font-size: .8rem; color: #64748b; margin: 0 0 10px; line-height: 1.4; }
+    .areas { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 12px; }
+    .areas label, .pick label { display: flex; align-items: flex-start; gap: 8px; font-size: .86rem; cursor: pointer; }
+    .areas input, .pick input { accent-color: #0284c7; width: 15px; height: 15px; margin: 2px 0 0; flex: 0 0 auto; }
+    .areas .all { font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9; }
+    .count { color: #94a3b8; font-size: .78rem; margin-left: 4px; }
+    .row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    button.btn { font: inherit; font-size: .84rem; font-weight: 600; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+      border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+    button.btn:hover { background: #f1f5f9; }
+    button.btn.primary { background: #0284c7; border-color: #0284c7; color: #fff; }
+    button.btn.primary:hover { background: #0369a1; }
+    button.btn:disabled { opacity: .5; cursor: not-allowed; }
+    .link { border: none; background: none; color: #0284c7; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; padding: 0; }
+    .link:hover { text-decoration: underline; }
+    .tip { font-size: .78rem; color: #64748b; margin-top: 10px; line-height: 1.4; }
+    .fileinfo { font-size: .82rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; margin: 10px 0; }
+    .warn { font-size: .82rem; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 10px; margin: 10px 0; line-height: 1.4; }
+    .warn ul { margin: 4px 0 6px 18px; padding: 0; }
+    .err { font-size: .82rem; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 10px; margin: 10px 0; }
+    .ok { font-size: .82rem; color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 8px 10px; margin: 10px 0; line-height: 1.45; }
+    .pick { border: 1px solid #e2e8f0; border-radius: 6px; max-height: 340px; overflow-y: auto; padding: 6px 10px; margin: 8px 0 12px; }
+    .pick .group { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #0284c7; margin: 8px 0 4px;
+      display: flex; align-items: center; gap: 8px; }
+    .pick .group:first-child { margin-top: 2px; }
+    .pick .item { padding-left: 4px; margin: 3px 0; }
+    .pick .empty { font-size: .8rem; color: #94a3b8; padding: 6px 0; }
+    .subhead { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .subhead h3 { font-size: .86rem; margin: 0; color: #0f172a; }
+    .dev { font-size: .74rem; color: #94a3b8; margin-top: 18px; }
+    .dev[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><img src="icons/icon128.png" alt="">Backup, Restore, Import &amp; Export</h1>
+    <p class="subtitle">
+      A <b>backup</b> saves everything you pick to one file, and <b>restore</b> puts it back, replacing what's there.
+      <b>Export</b> and <b>import</b> are for sharing: pick which saved filters or sharp book sets to put in a file,
+      and import adds them to what you already have.
+    </p>
+
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="backup" class="on">Backup &amp; Restore</button>
+      <button type="button" data-tab="share">Import &amp; Export</button>
+    </div>
+
+    <div class="panel" id="panel-backup">
+      <div class="card">
+        <h2>Back up</h2>
+        <p class="desc">Saves a file with everything you check.</p>
+        <div class="areas" id="backupAreas"></div>
+        <div class="row"><button type="button" class="btn primary" id="backupBtn">Back up…</button></div>
+        <div id="backupMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Restore</h2>
+        <p class="desc">Pick a backup file, choose what to restore, and it replaces what you have now. Only the parts you check are touched.</p>
+        <div class="row"><button type="button" class="btn" id="restorePick">Choose backup file…</button><input type="file" id="restoreFile" accept=".cnolh,.xml" hidden></div>
+        <div id="restoreBody"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-share" hidden>
+      <div class="card">
+        <h2>Export</h2>
+        <p class="desc">Pick the saved filters and sharp book sets to put in a file you can share or keep.</p>
+        <div id="exportBody">Loading…</div>
+        <div class="row"><button type="button" class="btn primary" id="exportBtn">Export…</button></div>
+        <div id="exportMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Import</h2>
+        <p class="desc">Pick an exported (or backup) file and choose what to add. Nothing you have is removed; items with the same name are replaced.</p>
+        <div class="row"><button type="button" class="btn" id="importPick">Choose file…</button><input type="file" id="importFile" accept=".cnolh,.xml" hidden></div>
+        <div id="importBody"></div>
+      </div>
+    </div>
+
+    <div class="dev" id="devNote" hidden></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="transfer.js"></script>
+</body>
+</html>

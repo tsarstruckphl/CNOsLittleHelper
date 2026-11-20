@@ -170,4 +170,7 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   if (msg && msg.type === 'cno-open-options' && sender.id === chrome.runtime.id) {
     chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
   }
+  if (msg && msg.type === 'cno-open-transfer' && sender.id === chrome.runtime.id) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('transfer.html' + (msg.tab === 'share' ? '#share' : '')) });
+  }
 });

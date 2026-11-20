@@ -49,10 +49,12 @@ processUpdateBannerAlert(); // Added update banner check
   processExcludePlayerUnders();
   processMultiLeagueFilter();
   processHiddenRowsNote();
+  processRowStriping();
   processUnusedExtraColumn();
   processGameBookColumns();
   processGameHeaderFilterMenus();
   processGameColFilter();
+  processRowStriping();
   processGameTableModern();
   processGameRowOrdering();
   processGameFocusRow();
@@ -66,6 +68,12 @@ processUpdateBannerAlert(); // Added update banner check
 }
 
 setInterval(runAll, 500);
+
+// Run as soon as the page has been read in full (the filter panel waits for that), instead of
+// waiting for the next half-second tick
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { if (userSettingsLoaded) runAll(); });
+}
 
 if (typeof Sys !== 'undefined' && Sys.WebForms && Sys.WebForms.PageRequestManager) {
   Sys.WebForms.PageRequestManager.getInstance().add_endRequest(() => {
