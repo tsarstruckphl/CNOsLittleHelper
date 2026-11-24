@@ -1,3 +1,20 @@
+1.2.4
+FEATURE ADDITIONS:
+--Injury report icon in the Event column (NBA, WNBA, NFL, MLB rows): opens a popup listing each team's injured players with position, status, injury and expected return, worst status first
+--"Copy for Discord" in the Sharp FV and Calc popups with bet links
+--QR button next to "Copy Devig's URL" on the Devigger
+--Game pages: "Sort by EV %" in a book's header menu adds a <BOOK> EV% column and sorts by it
+--Shorter Devigger comments (team and market abbreviations)
+--MLB "Excl. Weather" filter (shown when League is MLB); weather icons restyled and link to Rotowire
+--Calc popup: book name links to the bet, with a hover QR button
+--Swap Page shortcuts: Ctrl+Alt+E Positive EV, Ctrl+Alt+B Odds Boost, Ctrl+Alt+F Free Bet, Ctrl+Alt+K Risk Free Bet, Ctrl+Alt+G Bet and Get, Ctrl+Alt+W Win and Get, Ctrl+Alt+L Low Hold (Ctrl+Cmd on Mac), shown in the Swap Page menu
+--Various performance improvements
+--Site menus open on hover
+
+BUG FIXES:
+--Fixed Sharp FV and "Pair 2-/3-way lines" pairing a team's own spread with itself (e.g. Utah -1.5 with Utah +1.5) instead of with the other team's line
+--Sharp FV now works on soccer 3-way "Yes" bets (uses the Common 3-way market)
+
 1.2.3
 FEATURE ADDITIONS:
 --Custom Sharp Book Devigging: pick the books you trust as sharp for each sport or league and market type (all / player / non-player), averaged or weighted, with minimum liquidity for exchanges and your choice of devig method (default Worst-case)

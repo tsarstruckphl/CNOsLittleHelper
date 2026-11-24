@@ -158,8 +158,9 @@ function processAPRankings() {
 
   const standardRows = document.querySelectorAll('tr:not(.footable-row-detail)');
   standardRows.forEach(row => {
+    if (row.children.length < 5) return;
+    if (cnoRowScanned(row, 'ap', apRankingsMap)) return; // already checked against these rankings
     const cells = Array.from(row.children);
-    if (cells.length < 5) return;
 
     let sportKey = '';
     let eventCell = null;
@@ -413,9 +414,12 @@ async function loadAllInjuryData(forceRefresh = false) {
   if (!forceRefresh && cachedTime && cachedMapData && (now - parseInt(cachedTime, 10) < delayMs)) {
     try {
       const rawEntries = JSON.parse(cachedMapData);
-      injuryDataMap = new Map(rawEntries);
-      latestInjuryTimestamp = cachedTimestamp;
-      return;
+      // Copies saved before team/position were kept get refreshed once
+      if (!rawEntries.length || rawEntries.some(([, v]) => v && v.team !== undefined)) {
+        injuryDataMap = new Map(rawEntries);
+        latestInjuryTimestamp = cachedTimestamp;
+        return;
+      }
     } catch (e) {
       console.warn("Failed to parse cached injury data, fetching fresh.");
     }
@@ -424,19 +428,19 @@ async function loadAllInjuryData(forceRefresh = false) {
   let newestTsString = cachedTimestamp;
   const newMap = new Map();
 
-  for (const [sport, url] of Object.entries(INJURY_CSV_URLS)) {
+  // All four sheets download at once; they're read in the usual order afterwards
+  const entries = Object.entries(INJURY_CSV_URLS);
+  const texts = await Promise.all(entries.map(([sport, url]) =>
+    fetch(url).then(r => r.text()).catch(err => { console.error(`Failed to load injury data for ${sport}:`, err); return null; })));
+  entries.forEach(([sport], i) => {
+    if (texts[i] === null) return;
     try {
-      const response = await fetch(url);
-      const csvText = await response.text();
-      const extractedTs = parseInjuryCSV(sport, csvText, newMap);
-
-      if (extractedTs) {
-        newestTsString = extractedTs;
-      }
+      const extractedTs = parseInjuryCSV(sport, texts[i], newMap);
+      if (extractedTs) newestTsString = extractedTs;
     } catch (err) {
-      console.error(`Failed to load injury data for ${sport}:`, err);
+      console.error(`Failed to read injury data for ${sport}:`, err);
     }
-  }
+  });
 
   injuryDataMap = newMap;
   latestInjuryTimestamp = newestTsString || latestInjuryTimestamp;
@@ -499,7 +503,12 @@ function parseInjuryCSV(sport, csvText, targetMap) {
           rawStatus: rawStatus,
           fullDetails: fullDetails,
           surname: surname,
-          rawName: rawName
+          rawName: rawName,
+          // For the event injury report: team (short name, column F), position, injury, return date
+          team: (cols[5] || '').toUpperCase(),
+          pos: cols[6] || '',
+          injury: cols[7] || '',
+          returnDate: cols[9] || ''
         });
       }
     }
@@ -678,8 +687,9 @@ function processInjuryBadges() {
 
   const rows = document.querySelectorAll('tr');
   rows.forEach(row => {
+    if (row.children.length < 8) return;
+    if (cnoRowScanned(row, 'inj', injuryDataMap)) return; // already checked against this injury data
     const cells = Array.from(row.children);
-    if (cells.length < 8) return;
     if (row.querySelector('.cno-injury-badge')) return;
 
     let league = '';
@@ -820,6 +830,11 @@ const MLB_TEAM_NORM_MAP = {
 
 let mlbWeatherList = [];
 
+// Weather icons: a cloud with rain (possible delay/rainout) or with lightning (likely)
+const CNO_WEATHER_CLOUD = '<path d="M7 16.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9a3.75 3.75 0 0 1-.5 7.5"/>';
+const CNO_WEATHER_ICON_POSSIBLE = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;" aria-hidden="true">${CNO_WEATHER_CLOUD}<path d="M9 19.5l.8-1.6M13 19.5l.8-1.6M11 22l.8-1.6"/></svg>`;
+const CNO_WEATHER_ICON_LIKELY = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;" aria-hidden="true">${CNO_WEATHER_CLOUD}<path d="M12.5 13l-2 3.5h3l-2 3.5"/></svg>`;
+
 function cleanGameString(str) {
   if (!str) return '';
   return str
@@ -957,8 +972,9 @@ function processMLBWeatherBadges() {
 
   const rows = document.querySelectorAll('tr:not(.footable-row-detail)');
   rows.forEach(row => {
+    if (row.children.length < 6) return;
+    if (cnoRowScanned(row, 'wx', mlbWeatherList)) return; // already checked against this weather data
     const cells = Array.from(row.children);
-    if (cells.length < 6) return;
 
     let isMlb = false;
     let eventCell = null;
@@ -979,6 +995,7 @@ function processMLBWeatherBadges() {
     });
 
     if (!isMlb || !eventCell || eventCell.dataset.hasWeather) return;
+    row.dataset.cnoWeather = 'none'; // for the "Excl. Weather" filter
 
     const eventLink = eventCell.querySelector('a[href*="game.aspx"]') || eventCell.querySelector('a') || eventCell;
     const rawCnoEvent = eventLink.textContent.trim();
@@ -1009,14 +1026,19 @@ function processMLBWeatherBadges() {
     });
 
     if (match) {
-      const tooltipText = `${match.status} per Rotowires`;
-      const badgeHtml = ` <span class="cno-weather-badge" title="${tooltipText}" style="cursor:help; font-size:1.0em; vertical-align:middle; margin-left:3px;">${match.icon}</span>`;
-
-      if (eventLink.tagName === 'A') {
-        eventLink.insertAdjacentHTML('beforeend', badgeHtml);
-      } else {
-        eventCell.insertAdjacentHTML('beforeend', badgeHtml);
-      }
+      const likely = /likely/i.test(match.status);
+      row.dataset.cnoWeather = likely ? 'likely' : 'possible';
+      // Same line-icon style and blue as the extension's other icons; opens Rotowire's weather page
+      const badge = document.createElement('a');
+      badge.className = 'cno-weather-badge';
+      badge.href = 'https://www.rotowire.com/baseball/weather.php';
+      badge.target = '_blank';
+      badge.rel = 'noopener';
+      badge.title = `${match.status} per Rotowire (click for Rotowire's weather page)`;
+      badge.innerHTML = likely ? CNO_WEATHER_ICON_LIKELY : CNO_WEATHER_ICON_POSSIBLE;
+      badge.addEventListener('click', (e) => e.stopPropagation());
+      if (eventLink.tagName === 'A') eventLink.insertAdjacentElement('afterend', badge);
+      else eventCell.appendChild(badge);
     }
 
     eventCell.dataset.hasWeather = "true";

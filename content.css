@@ -173,6 +173,7 @@ html.cno-modern-ui #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 inp
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-league-hidden,
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-under-hidden,
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-injured-hidden,
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-weather-hidden,
 #ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tr.cno-hedge-hidden {
   display: none !important;
 }
@@ -936,10 +937,14 @@ table.lh-paired tr.lh-group-end > td {
 .cno-sharp-bet { font-size: 12px; color: #64748b; margin: 2px 0 8px; }
 .cno-sharp-loading { color: #64748b; font-size: 12.5px; padding: 14px 0; text-align: center; }
 .cno-sharp-error { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 8px; }
-.cno-sharp-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
+.cno-sharp-tiles { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1.25fr) minmax(0, 0.85fr) minmax(0, 0.85fr); gap: 6px; margin-bottom: 9px; }
+/* Sharp EV%: the headline number */
+.cno-sharp-tile.cno-sharp-tile-main { background: #e0f2fe; border: 1px solid #bae6fd; }
+.cno-sharp-tile.cno-sharp-tile-main .cno-sharp-tile-label { color: #0369a1; font-weight: 600; }
+.cno-sharp-tile.cno-sharp-tile-main .cno-sharp-tile-value { font-size: 24px; line-height: 1.15; }
 .cno-sharp-tile { background: #f1f5f9; border-radius: 7px; padding: 6px 8px; }
 .cno-sharp-tile-label { font-size: 11px; color: #64748b; }
-.cno-sharp-tile-value { font-size: 17px; font-weight: 700; }
+.cno-sharp-tile-value { font-size: 16px; font-weight: 700; }
 .cno-sharp-tile-value.cno-pos { color: #047857; }
 .cno-sharp-tile-value.cno-neg { color: #b91c1c; }
 .cno-sharp-tile-sub { font-size: 11px; color: #64748b; margin-top: 1px; }
@@ -1064,3 +1069,54 @@ a.cno-devigger-btn.cno-calc-sharp-btn:hover {
 .cno-calc-boost-out.cno-pos { color: #047857; }
 .cno-calc-boost-out.cno-neg { color: #b91c1c; }
 .cno-calc-boost-out.cno-busy { color: #64748b; font-weight: 500; }
+
+/* Event injury report popup (shares the Sharp FV popup's look) */
+.cno-injury-popup { width: 440px; }
+.cno-injury-popup .cno-sharp-event { font-size: 12px; color: #475569; margin: 2px 0 4px; }
+.cno-inj-team { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 13px; color: #0f172a; margin: 10px 0 3px; }
+.cno-inj-count { font-weight: 500; font-size: 11px; color: #94a3b8; }
+.cno-inj-row {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) 34px 112px minmax(0, 1.3fr); gap: 6px; align-items: center;
+  font-size: 12px; color: #334155; padding: 4px 0; border-top: 1px solid #f1f5f9;
+}
+.cno-inj-name { font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cno-inj-pos { color: #94a3b8; font-size: 11px; }
+.cno-inj-badge { justify-self: start; font-size: 10.5px; font-weight: 700; color: #ffffff; border-radius: 4px; padding: 1px 6px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cno-inj-detail { color: #64748b; font-size: 11px; }
+.cno-inj-none { font-size: 12px; color: #94a3b8; padding: 2px 0 4px; }
+
+/* Calc popup: Book name links to the bet, QR button on hover */
+a.cno-calc-book-link { color: #0369a1 !important; text-decoration: underline; font-weight: 600; }
+a.cno-calc-book-link:hover { color: #075985 !important; }
+.cno-calc-book .cno-qr-btn { margin-left: 5px !important; padding: 1px 5px !important; font-size: 0.7rem !important; }
+.cno-calc-book:hover .cno-hover-filter-btn { visibility: visible; }
+
+/* MLB weather icons (Event cell): line icons in the extension's blue, link to Rotowire */
+a.cno-weather-badge {
+  display: inline-flex; align-items: center; vertical-align: middle; margin-left: 5px; padding: 2px;
+  color: #0284c7 !important; border-radius: 4px; text-decoration: none !important; cursor: pointer;
+}
+a.cno-weather-badge:hover { background: #e0f2fe; }
+
+/* MLB "Excl. Weather" line (only shown when League is MLB) */
+#cno-mlb-weather-row { flex-direction: row; align-items: center; gap: 8px; }
+#cno-mlb-weather-row label { margin: 0; white-space: nowrap; }
+/* Same height, font and border as the Refine: Leagues dropdown (width fills the line, as before) */
+#cno-mlb-weather-row select#cno-mlb-weather-select {
+  flex: 1 1 auto; min-width: 0; box-sizing: border-box;
+  height: auto !important; padding: 5px 8px !important; font-size: 0.82rem !important; line-height: normal;
+  color: #0f172a; background-color: #ffffff; border: 1px solid #cbd5e1 !important; border-radius: 4px !important;
+}
+
+/* Game page: "<BOOK> EV%" column (Sort by EV %) */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 th.cno-ev-col { white-space: nowrap; text-align: center; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.cno-ev-col { text-align: center; font-weight: 700; white-space: nowrap; background: #f8fafc; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.cno-ev-col.cno-ev-pos { color: #047857; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td.cno-ev-col.cno-ev-neg { color: #b91c1c; }
+/* Sharp FV: QK bet size in whole dollars, and the boost note under "Sharp EV%" */
+.cno-sharp-betsize-amt { font-size: 15px; font-weight: 700; color: #0f172a; }
+.cno-sharp-tile-boost { font-size: 10.5px; font-weight: 500; }
+/* Sharp FV footer: Copy for Discord, then Open in Devigger */
+.cno-sharp-foot-links { display: inline-flex; align-items: center; gap: 12px; }
+/* Calc popup: Copy for Discord, under the last line */
+.cno-calc-share { text-align: center; margin: 8px 0 0; font-size: 12px; }

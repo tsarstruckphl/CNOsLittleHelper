@@ -531,14 +531,41 @@ function buildCrossToolUrl(targetPage, scopeContainer = document) {
 }
 
 const SWITCH_PAGES = [
-  { key: 'positive-ev', label: 'Positive EV', icon: 'positiveEv' },
-  { key: 'odds-boost', label: 'Odds Boost', icon: 'rocket' },
-  { key: 'free-bet-converter', label: 'Free Bet', icon: 'gift' },
-  { key: 'risk-free-bet', label: 'Risk Free Bet', icon: 'shield' },
-  { key: 'bet-and-get', label: 'Bet and Get', icon: 'ticket' },
-  { key: 'win-and-get', label: 'Win and Get', icon: 'trophy' },
-  { key: 'low-hold', label: 'Low Hold', icon: 'lowHold' }
+  { key: 'positive-ev', label: 'Positive EV', icon: 'positiveEv', shortcut: 'E' },
+  { key: 'odds-boost', label: 'Odds Boost', icon: 'rocket', shortcut: 'B' },
+  { key: 'free-bet-converter', label: 'Free Bet', icon: 'gift', shortcut: 'F' },
+  { key: 'risk-free-bet', label: 'Risk Free Bet', icon: 'shield', shortcut: 'K' },
+  { key: 'bet-and-get', label: 'Bet and Get', icon: 'ticket', shortcut: 'G' },
+  { key: 'win-and-get', label: 'Win and Get', icon: 'trophy', shortcut: 'W' },
+  { key: 'low-hold', label: 'Low Hold', icon: 'lowHold', shortcut: 'L' }
 ];
+
+// Swap Page shortcuts: Ctrl+Alt+<letter> (Windows/Linux) or Ctrl+Cmd+<letter> (Mac)
+function cnoSwapShortcutLabel(letter) {
+  return typeof cnoIsMac === 'function' && cnoIsMac() ? `Ctrl+\u2318+${letter}` : `Ctrl+Alt+${letter}`;
+}
+
+// Goes to another tool page, carrying the current selections over (same as the Swap Page menu)
+function cnoSwapToPage(key) {
+  const container = getFilterAccordionContainer() || document;
+  window.location.href = buildCrossToolUrl(`/site/tools/${key}.aspx`, container);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat || !/^Key[A-Z]$/.test(e.code)) return;
+  const matches = cnoIsMac()
+    ? (e.ctrlKey && e.metaKey && !e.altKey && !e.shiftKey)
+    : (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey);
+  if (!matches) return;
+  const page = SWITCH_PAGES.find(p => p.shortcut === e.code.slice(3));
+  if (!page) return;
+  // Only where the Swap Page button is offered, and not for the page you're on
+  if (!document.getElementById('cno-switch-page-btn')) return;
+  if (window.location.pathname.toLowerCase().includes(`${page.key}.aspx`)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  cnoSwapToPage(page.key);
+}, true);
 
 // Hover (or click) drop-down listing the other tool pages
 function attachSwitchPageMenu(btn) {
@@ -567,15 +594,19 @@ function attachSwitchPageMenu(btn) {
       const item = document.createElement('button');
       item.type = 'button';
       cnoSetIconLabel(item, p.icon, p.label);
-      item.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; padding:7px 10px; font-size:0.85rem; font-weight:600; color:#0369a1; cursor:pointer; border-radius:4px; white-space:nowrap;';
+      // The page's shortcut, on the right
+      const keys = document.createElement('span');
+      keys.textContent = cnoSwapShortcutLabel(p.shortcut);
+      keys.style.cssText = 'margin-left:auto; padding-left:18px; font-size:0.72rem; font-weight:500; color:#94a3b8;';
+      item.appendChild(keys);
+      item.title = `Shortcut: ${cnoSwapShortcutLabel(p.shortcut)}`;
+      item.style.cssText = 'display:flex; align-items:center; gap:4px; width:100%; text-align:left; background:none; border:none; padding:7px 10px; font-size:0.85rem; font-weight:600; color:#0369a1; cursor:pointer; border-radius:4px; white-space:nowrap;';
       item.addEventListener('mouseover', () => item.style.background = '#f0f9ff');
       item.addEventListener('mouseout', () => item.style.background = 'none');
       item.addEventListener('click', (e) => {
         e.stopPropagation();
-        const container = getFilterAccordionContainer() || document;
-        const url = buildCrossToolUrl(`/site/tools/${p.key}.aspx`, container);
         hide();
-        window.location.href = url;
+        cnoSwapToPage(p.key);
       });
       menu.appendChild(item);
     });
@@ -672,6 +703,7 @@ function clearAllPageFilters(container = document) {
 
   // Multi-league filter: back to all leagues
   setMultiLeagueSelection(null);
+  if (typeof setMlbWeatherFilter === 'function') setMlbWeatherFilter('all');
 
   const elTop25Cb = container.querySelector('#cno-top25-cb') || document.querySelector('#cno-top25-cb');
   if (elTop25Cb) {
@@ -912,8 +944,8 @@ function setupFilterToggle() {
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   `;
 
-  if (isClassic) cnoSetIconLabel(toggleBtn, 'enhanced', 'Switch to Enhanced View');
-  else cnoSetIconLabel(toggleBtn, 'classic', 'Switch to Classic View');
+  if (isClassic) cnoSetIconLabel(toggleBtn, 'enhanced', 'Switch to Enhanced Filters');
+  else cnoSetIconLabel(toggleBtn, 'classic', 'Switch to Classic Filters');
 
   toggleBtn.onclick = (e) => {
     e.stopPropagation();
@@ -2574,6 +2606,7 @@ function collectFilterSelections(container = document) {
   if (injuredOnlyCb) sel.checks.injuredOnly = injuredOnlyCb.checked;
   const playerUndersCb = document.querySelector('#cno-exclude-player-unders-cb');
   if (playerUndersCb) sel.checks.excludePlayerUnders = playerUndersCb.checked;
+  if (document.getElementById('cno-mlb-weather-select')) sel.checks.mlbWeather = cnoMlbWeatherFilter;
   if (document.getElementById('cno-multi-league')) sel.multiLeague = cnoMultiLeagueSelection ? cnoMultiLeagueSelection.slice() : 'all';
 
   // Hedge Sportsbook Filter: 'all' or the list of selected books
@@ -2728,6 +2761,9 @@ function applyFilterSelectionsNow(container, sel) {
     // Same as clicking it: remember the choice for this page and hide/show rows
     playerUndersCbApply.dispatchEvent(new Event('change', { bubbles: true }));
   }
+
+  // MLB weather: the saved choice, or Include All when the filter doesn't mention it
+  if (document.getElementById('cno-mlb-weather-select')) setMlbWeatherFilter(checks.mlbWeather || 'all');
 
   // Multi-league filter: the saved leagues, or all leagues when the filter doesn't mention it
   if (document.getElementById('cno-multi-league')) {
@@ -3793,10 +3829,25 @@ function getListTableColumns(table) {
 }
 
 // Cell text without anything the extension added (badges, icons)
+// A cell's text without anything the extension added (elements whose class starts with "cno-").
+// Walks the text directly instead of copying the cell (same result as the old copy-and-strip,
+// checked against real tables, about 2.5x faster).
+const CNO_ADDED_CLASS_RE = /(^| )cno-/;
 function getCleanCellText(cell) {
-  const clone = cell.cloneNode(true);
-  clone.querySelectorAll('[class^="cno-"], [class*=" cno-"]').forEach(el => el.remove());
-  return clone.textContent.replace(/"/g, '').replace(/\s+/g, ' ').trim();
+  if (!cell) return '';
+  let out = '';
+  const walk = (node) => {
+    for (let n = node.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3) out += n.data;
+      else if (n.nodeType === 1) {
+        const cls = n.getAttribute('class');
+        if (cls && CNO_ADDED_CLASS_RE.test(cls)) continue;
+        walk(n);
+      }
+    }
+  };
+  walk(cell);
+  return out.replace(/"/g, '').replace(/\s+/g, ' ').trim();
 }
 
 // "Zach Edey Under 7.5" -> "Zach Edey", "Pelicans +12.5" -> "Pelicans", "Bam Adebayo Yes" -> "Bam Adebayo".
@@ -3981,6 +4032,9 @@ function getCalcRowDeviggerUrl(btn) {
     // devigged (fair) chance the bet wins, so the fair odds follow from it. Not on Hedge.
     const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
     if (heads.some(h => h.startsWith('hedge'))) return null;
+    // Risk Free Bet, Bet and Get, Win and Get: the Devigger and Sharp FV can only show a plain
+    // bet's EV%, not the promo's, so FV Devig / Sharp FV aren't offered there (Free Bet keeps them)
+    if (/(risk-free-bet|bet-and-get|win-and-get)\.aspx/i.test(window.location.pathname)) return null;
     const hitIdx = heads.indexOf('ev hit%');
     const hitCell = hitIdx !== -1 ? row.children[hitIdx] : null;
     const pct = hitCell ? parseFloat(getCleanCellText(hitCell).replace(/[^0-9.]/g, '')) : NaN;
@@ -3992,7 +4046,8 @@ function getCalcRowDeviggerUrl(btn) {
   const headerTexts = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
   const eventIdx = headerTexts.indexOf('event');
   const textAt = (i) => (i >= 0 && row.children[i]) ? getCleanCellText(row.children[i]) : '';
-  const legOdds = cnoBuildDeviggerLegOdds(fairOdds.replace('+', ''), textAt(eventIdx), textAt(cols.market), textAt(cols.betName));
+  const legOdds = cnoBuildDeviggerLegOdds(fairOdds.replace('+', ''), textAt(eventIdx), textAt(cols.market), textAt(cols.betName),
+    [textAt(headerTexts.indexOf('sport')), textAt(headerTexts.indexOf('league'))].filter(Boolean).join(' - '));
 
   // Odds Boost page with "Odds Surge": the surge amount is added to the odds themselves
   let surgedOdds = finalOdds;
@@ -4359,7 +4414,7 @@ function processHedgeBookFilter() {
   if (hedgeIdx !== -1) {
     table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
       const cell = row.children[hedgeIdx];
-      const match = !!cell && targets.has(getCleanCellText(cell).toLowerCase());
+      const match = !!cell && targets.has(cnoCellText(cell).toLowerCase());
       row.classList.toggle('cno-hedge-hidden', !match);
       // Keep an expanded (mobile/narrow view) detail row in step with its main row
       const next = row.nextElementSibling;
@@ -4654,9 +4709,9 @@ function processInjuredRowExclusion() {
     table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
       let injured = false;
       if (leagueIdx !== -1 && nameIdx !== -1) {
-        const league = (row.children[leagueIdx] ? getCleanCellText(row.children[leagueIdx]) : '').toUpperCase();
+        const league = (row.children[leagueIdx] ? cnoCellText(row.children[leagueIdx]) : '').toUpperCase();
         if (VALID_INJURY_LEAGUES.includes(league) && row.children[nameIdx]) {
-          const name = normalizePlayerName(getCleanCellText(row.children[nameIdx]));
+          const name = normalizePlayerName(cnoCellText(row.children[nameIdx]));
           injured = !!name && injuryDataMap.has(`${league}|${name}`);
         }
       }
@@ -4684,7 +4739,7 @@ function processUnusedExtraColumn() {
 
   const rows = Array.from(table.querySelectorAll('tbody tr:not(.footable-row-detail)'));
   const cellIsEmpty = (cell) => !cell ||
-    (getCleanCellText(cell) === '' && !cell.querySelector('img, input, svg, a'));
+    (cnoCellText(cell) === '' && !cell.querySelector('img, input, svg, a'));
 
   const hide = !!(typeof userSettings !== 'undefined' && userSettings.hideUnusedExtraColumn) &&
     rows.every(row => cellIsEmpty(row.children[idx]));
@@ -4950,18 +5005,23 @@ function isExcludePlayerUndersOn() {
 }
 
 // "Exclude Player Unders" with "Refine: Leagues" to its right
+// "Excl. Player Unders" with "Refine: Leagues" to its right (always one line), and the MLB-only
+// "Excl. Weather" line under them
 function createUndersAndLeaguesRow() {
+  const outer = document.createElement('div');
   const wrap = document.createElement('div');
   wrap.className = 'cno-unders-leagues-row';
-  wrap.style.cssText = 'display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;';
+  wrap.style.cssText = 'display:flex; align-items:flex-end; gap:12px; flex-wrap:nowrap;';
   const unders = createExcludePlayerUndersRow();
-  unders.style.cssText += 'flex:0 0 auto; padding-bottom:6px;';
+  unders.style.cssText += 'flex:0 0 auto; padding-bottom:6px; white-space:nowrap;';
   const leagues = createMultiLeagueRow();
-  leagues.style.flex = '1 1 180px';
-  leagues.style.minWidth = '160px';
+  leagues.style.flex = '1 1 0';
+  leagues.style.minWidth = '0';
   wrap.appendChild(unders);
   wrap.appendChild(leagues);
-  return wrap;
+  outer.appendChild(wrap);
+  outer.appendChild(createMlbWeatherRow());
+  return outer;
 }
 
 function createExcludePlayerUndersRow() {
@@ -4984,7 +5044,7 @@ function createExcludePlayerUndersRow() {
   });
 
   label.appendChild(cb);
-  label.appendChild(document.createTextNode(' Exclude Player Unders'));
+  label.appendChild(document.createTextNode(' Excl. Player Unders'));
   label.appendChild(createRowsFilterHint());
   row.appendChild(label);
   return row;
@@ -5013,8 +5073,8 @@ function processExcludePlayerUnders() {
     const marketCell = row.children[cols.market];
     const betCell = row.children[cols.betName];
     const hide = !!marketCell && !!betCell &&
-      getCleanCellText(marketCell).toLowerCase().includes('player') &&
-      isPlayerUnderBet(getCleanCellText(betCell));
+      cnoCellText(marketCell).toLowerCase().includes('player') &&
+      isPlayerUnderBet(cnoCellText(betCell));
     row.classList.toggle('cno-under-hidden', hide);
     const next = row.nextElementSibling;
     if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-under-hidden', hide);
@@ -5432,6 +5492,8 @@ function updateFvDevigPop(td) {
 document.addEventListener('mouseover', (e) => {
   const td = e.target && e.target.closest ? e.target.closest('td.lh-calc.lh-has-fv') : null;
   if (!td) return;
+  // Moving around inside the same cell: already set up for this hover
+  if (e.relatedTarget && td.contains(e.relatedTarget)) return;
   const btn = td.querySelector('input[type="button"][value="Calc"]');
   const pop = td.querySelector('.cno-fv-pop');
   if (!btn || !pop) return;
@@ -5677,7 +5739,34 @@ function createMultiLeagueRow() {
     font-size: 0.82rem; color: #0f172a; cursor: pointer; text-align: left;
   `;
   toggle.innerHTML = '<span class="cno-ml-summary" style="flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></span><span style="color:#64748b;">▾</span>';
-  row.appendChild(toggle);
+
+  // Clear: back to all leagues (same look as the text boxes' clear buttons)
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'cno-ml-clear';
+  clearBtn.tabIndex = -1;
+  clearBtn.title = 'Clear: show all leagues';
+  clearBtn.innerHTML = ERASER_SVG_ICON;
+  clearBtn.style.cssText = `
+    background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; width: 34px; padding: 0;
+    cursor: pointer; color: #475569; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; align-self: stretch; transition: background-color 0.15s, color 0.15s;
+  `;
+  clearBtn.addEventListener('mouseover', () => { if (!clearBtn.disabled) { clearBtn.style.background = '#e2e8f0'; clearBtn.style.color = '#0f172a'; } });
+  clearBtn.addEventListener('mouseout', () => { clearBtn.style.background = '#f1f5f9'; clearBtn.style.color = '#475569'; });
+  clearBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMultiLeagueSelection(null);
+  });
+
+  const toggleRow = document.createElement('div');
+  toggleRow.style.cssText = 'display:flex; align-items:stretch; gap:4px; width:100%;';
+  toggle.style.flex = '1 1 auto';
+  toggle.style.minWidth = '0';
+  toggleRow.appendChild(toggle);
+  toggleRow.appendChild(clearBtn);
+  row.appendChild(toggleRow);
 
   const panel = document.createElement('div');
   panel.className = 'cno-ml-panel';
@@ -5777,6 +5866,13 @@ function syncMultiLeaguePicker(rebuildList = true) {
   toggle.style.cursor = enabled ? 'pointer' : 'not-allowed';
   toggle.title = enabled ? '' : 'Set League to "All" to pick several leagues';
   const sel = cnoMultiLeagueSelection;
+  const clearBtn = row.querySelector('.cno-ml-clear');
+  if (clearBtn) {
+    const canClear = enabled && !!sel;
+    clearBtn.disabled = !canClear;
+    clearBtn.style.opacity = canClear ? '1' : '0.45';
+    clearBtn.style.cursor = canClear ? 'pointer' : 'default';
+  }
   const text = !sel ? 'All leagues' : sel.length === 0 ? 'None selected (shows all)' : sel.length <= 3 ? sel.join(', ') : `${sel.length} leagues`;
   if (summary.textContent !== text) summary.textContent = text;
   const panel = row.querySelector('.cno-ml-panel');
@@ -5799,7 +5895,7 @@ function processMultiLeagueFilter() {
   table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
     const cell = row.children[leagueIdx];
     if (!cell) return;
-    const hide = !keep.has(getCleanCellText(cell).toLowerCase());
+    const hide = !keep.has(cnoCellText(cell).toLowerCase());
     row.classList.toggle('cno-league-hidden', hide);
     const next = row.nextElementSibling;
     if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-league-hidden', hide);
@@ -5820,7 +5916,8 @@ function processHiddenRowsNote() {
   const reasons = [
     ['cno-injured-hidden', 'injured players', !!(document.getElementById('cno-exclude-injured-cb') || {}).checked],
     ['cno-under-hidden', 'player unders', !!(document.getElementById('cno-exclude-player-unders-cb') || {}).checked],
-    ['cno-league-hidden', 'other leagues', !!(cnoMultiLeagueSelection && cnoMultiLeagueSelection.length)]
+    ['cno-league-hidden', 'other leagues', !!(cnoMultiLeagueSelection && cnoMultiLeagueSelection.length)],
+    ['cno-weather-hidden', 'rainout risk', cnoMlbWeatherFilter !== 'all'],
   ];
   const parts = [];
   let total = 0;
@@ -5919,7 +6016,12 @@ function cnoSharpRowInfo(btn) {
   if (!row || !table) return null;
   const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
   if (heads.some(h => h.startsWith('hedge'))) return null;
-  const cellAt = (name) => { const i = heads.indexOf(name); return i >= 0 ? row.children[i] : null; };
+  // The Free Bet page names its columns "Free Bet Name" / "Free Bet Odds" / "Free Bet Sportsbook"
+  const cellAt = (name) => {
+    let i = heads.indexOf(name);
+    if (i < 0) i = heads.indexOf(`free bet ${name}`);
+    return i >= 0 ? row.children[i] : null;
+  };
   const textAt = (name) => { const c = cellAt(name); return c ? getCleanCellText(c) : ''; };
   const sport = textAt('sport');
   const league = textAt('league');
@@ -6049,6 +6151,7 @@ async function cnoFetchGameTable(gameUrl) {
   if (!content) throw new Error('no odds table in the response');
   const table = new DOMParser().parseFromString(content, 'text/html').querySelector('table[id*="GridView"]');
   if (!table) throw new Error('no odds table in the response');
+  table.cnoDoc = doc; // the page itself (its Market / Sub-market dropdowns)
   return table;
 }
 
@@ -6086,7 +6189,7 @@ async function cnoDevigApi(legOdds, finalOdds, method, extra) {
   const p = new URLSearchParams({ api: 'open', LegOdds: legOdds, FinalOdds: String(finalOdds).replace('+', ''), Correlation_Bool: '0', Boost_Bool: '0' });
   p.set('DevigMethod', String(CNO_DEVIG_METHOD_CODES[method] !== undefined ? CNO_DEVIG_METHOD_CODES[method] : 4));
   ['Multiplicative', 'Additive', 'Power', 'Shin'].forEach(m => p.set(`WorstCase_${m}`, '1'));
-  p.set('Args', 'ev_p,kelly,dm');
+  p.set('Args', 'ev_p,kelly,dm,fb_p');
   Object.entries(extra || {}).forEach(([k, v]) => p.set(k, v));
   const res = await fetch(`${CNO_DEVIG_API}?${p.toString()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error('devigger ' + res.status);
@@ -6103,7 +6206,7 @@ function cnoExactAmerican(p) {
 
 function cnoSharpFinal(d) {
   const f = d.Final || {};
-  return { fair: f.FairValue, ev: f.EV_Percentage, kellyFull: f.Kelly_Full, legJuice: d['Leg#1'] ? d['Leg#1'].MarketJuice : undefined };
+  return { fair: f.FairValue, ev: f.EV_Percentage, kellyFull: f.Kelly_Full, fb: f.FB_Percentage, legJuice: d['Leg#1'] ? d['Leg#1'].MarketJuice : undefined };
 }
 
 function getGameBookFullNameSafe(code) {
@@ -6128,11 +6231,37 @@ async function cnoComputeSharp(info) {
   const sideId = new URL(info.gameUrl, window.location.origin).searchParams.get('side_id');
   const target = rows.find(r => r.id === sideId);
   if (!target) throw new Error("couldn't find this line on the game page");
-  const group = (groupGameRows(rows, { betName: 0 }).find(g => g.includes(target)) || [target]);
+
+  // Soccer 3-way "<Team> Yes" / "Draw Yes": that sub-market is one-way at almost every book, so
+  // the sharp prices come from the "Common" sub-market's full 3-way (Home / Draw / Away) instead.
+  // The bet's own odds still come from its own line.
+  let sharpCodes = codes, sharpRows = rows, sharpTarget = target, viaCommon = false;
+  const targetName = target.cells[0].textContent.replace(/\s+/g, ' ').trim();
+  if (/^soccer$/i.test(info.sport || '') && /3-way/i.test(info.market || '') && /\s+yes$/i.test(targetName)) {
+    const sel = table.cnoDoc && table.cnoDoc.querySelector('select[id$="DropDownListSubMarket"]');
+    const common = sel && Array.from(sel.options).find(o => /^common$/i.test(o.textContent.trim()));
+    if (common) {
+      const u = new URL(info.gameUrl, window.location.origin);
+      u.searchParams.set('submarket_id', common.value);
+      u.searchParams.delete('side_id');
+      const ct = await cnoFetchGameTable(u.href);
+      const cRows = Array.from(ct.rows).slice(1).filter(r => r.id && r.cells.length > 2);
+      const want = targetName.replace(/\s+yes$/i, '').trim().toLowerCase();
+      const cTarget = cRows.find(r => r.cells[0].textContent.replace(/\s+/g, ' ').trim().toLowerCase() === want);
+      if (cTarget) {
+        sharpCodes = Array.from((ct.rows[0] || { cells: [] }).cells).map(c => c.textContent.replace(/\s+/g, '').toUpperCase());
+        sharpRows = cRows;
+        sharpTarget = cTarget;
+        viaCommon = true;
+      }
+    }
+  }
+
+  const group = (groupGameRows(sharpRows, { betName: 0 }).find(g => g.includes(sharpTarget)) || [sharpTarget]);
   if (group.length < 2) throw new Error("couldn't find the other side of this line on the game page");
   // One-way lists (e.g. every player's anytime TD) group together but aren't one market
   if (group.length > 3) throw Object.assign(new Error('Sharp FV works on 2-way and 3-way lines only.'), { plain: true });
-  const sides = [target].concat(group.filter(r => r !== target));
+  const sides = [sharpTarget].concat(group.filter(r => r !== sharpTarget));
   const sideNames = sides.map(r => r.cells[0].textContent.replace(/\s+/g, ' ').trim());
 
   // The bet's own odds, fresh from the game page (falls back to the table's)
@@ -6145,7 +6274,7 @@ async function cnoComputeSharp(info) {
 
   // Each sharp book: its prices for every side, and whether it can be used
   const books = info.set.books.map(b => {
-    const col = codes.indexOf(b.code);
+    const col = sharpCodes.indexOf(b.code);
     const cells = sides.map(r => col === -1 ? null : cnoParseGameCell(r.cells[col]));
     const out = { code: b.code, name: getGameBookFullNameSafe(b.code), setWeight: b.weight, minLiq: b.minLiq, cells, usable: false, reason: '' };
     const have = cells.filter(Boolean).length;
@@ -6159,7 +6288,7 @@ async function cnoComputeSharp(info) {
   const usable = books.filter(b => b.usable);
   const r = {
     info, readAt, sideNames, books, usable: usable.length, method: info.devigMethod, mode: info.set.mode,
-    freshOdds: fresh ? fresh.odds : null, betCode, baseOdds, finalOdds, gameFinalOdds: finalOdds, surge, pageBoost, comment
+    freshOdds: fresh ? fresh.odds : null, betCode, baseOdds, finalOdds, gameFinalOdds: finalOdds, surge, pageBoost, comment, viaCommon
   };
   if (!usable.length) return r;
 
@@ -6206,9 +6335,16 @@ async function cnoSharpFinals(r, extraBoostPct) {
   // lists each sharp book's FV and weight
   const link = new URL(r.info.fvUrl);
   const sharpDesc = r.books.filter(b => b.usable)
-    .map(b => `${b.code} ${cnoProbabilityToAmerican(b.fair) || '?'} (${Math.round(b.share * 1000) / 10}%)`).join(', ');
-  const desc = [r.comment, sharpDesc ? `Sharps: ${sharpDesc}` : ''].filter(Boolean).join(' | ');
-  link.searchParams.set('LegOdds', desc ? `${r.leg}     // ${desc}` : r.leg);
+    .map(b => `${b.code} ${cnoProbabilityToAmerican(b.fair) || '?'} ${Math.round(b.share * 1000) / 10}%`).join(', ');
+  // The Devigger's server refuses a "%" in the address; it reads "_PCT_" as % (its own links do this)
+  // Weighted links carry one fair number (the Devigger shows 0% juice for it), so the sharps'
+  // weighted juice goes in the comment
+  const juiceDesc = r.mode === 'weighted' && isFinite(r.juice) ? `vig ${(r.juice * 100).toFixed(1)}%` : '';
+  const desc = [r.comment, sharpDesc ? `Sharps: ${sharpDesc}` : '', juiceDesc].filter(Boolean).join(' | ').replace(/%/g, '_PCT_');
+  // Weighted: just the pooled fair odds (one number, already no-vig). The two-sided
+  // "+135.38/-135.38" form made the Devigger report 0% juice. Average sets keep their AVG(...) line.
+  const legForLink = r.mode === 'weighted' ? String(r.leg).split('/')[0] : r.leg;
+  link.searchParams.set('LegOdds', desc ? `${legForLink}     // ${desc}` : legForLink);
   link.searchParams.set('FinalOdds', String(r.finalOdds).replace('+', ''));
   ['Boost_Bool', 'Boost_Text', 'Boost_Type'].forEach(k => link.searchParams.delete(k));
   Object.entries(boost).forEach(([k, v]) => link.searchParams.set(k, v));
@@ -6376,7 +6512,7 @@ function cnoOpenSharpPopup(btn, anchor) {
   const body = cnoSharpEl('div', 'cno-sharp-body');
   el.appendChild(body);
   document.body.appendChild(el);
-  cnoSharpPopupState = { btn, el };
+  cnoSharpPopupState = { btn, el, anchor: anchor || null, fromCalc: !!(anchor && anchor.closest && anchor.closest('[id$="PanelPopupCalc"]')) };
   place(el);
 
   let current = null; // last calculation (game page + per-book devigs)
@@ -6408,6 +6544,7 @@ function cnoOpenSharpPopup(btn, anchor) {
     } else if (info.tableOdds && r.freshOdds !== info.tableOdds) {
       notes.push(`Updated from the game page (table showed ${info.tableOdds}).`);
     }
+    if (r.viaCommon) notes.push('Sharp prices from the full 3-way (Common) market.');
     if (r.surge !== null && !oddsEdited) notes.push(`Includes the ${r.surge > 0 ? '+' : ''}${r.surge} surge (${r.baseOdds} listed).`);
     oddsNote.textContent = notes.join(' ');
     cnoRenderSharpResult(body, r, defaultsCache);
@@ -6529,29 +6666,36 @@ function cnoRenderSharpResult(body, r, defaults) {
     const kellyPct = r.kellyFull > 0 ? r.kellyFull * mult : 0; // % of bankroll = units
 
     const tiles = cnoSharpEl('div', 'cno-sharp-tiles');
-    const tile = (label, value, cls, sub) => {
-      const t = cnoSharpEl('div', 'cno-sharp-tile');
+    const tile = (label, value, cls, sub, tileCls) => {
+      const t = cnoSharpEl('div', 'cno-sharp-tile' + (tileCls ? ' ' + tileCls : ''));
       t.appendChild(cnoSharpEl('div', 'cno-sharp-tile-label', label));
       t.appendChild(cnoSharpEl('div', 'cno-sharp-tile-value' + (cls ? ' ' + cls : ''), value));
       if (sub) t.appendChild(cnoSharpEl('div', 'cno-sharp-tile-sub', sub));
       tiles.appendChild(t);
+      return t;
     };
-    tile('Fair odds', cnoProbabilityToAmerican(r.fair) || '—', '', isFinite(r.fair) ? `${(r.fair * 100).toFixed(1)}% to hit` : '');
-    tile(r.boostPct ? `Sharp EV% (${r.boostPct}% boost)` : 'Sharp EV%', cnoFmtPct(r.ev, true), r.ev > 0 ? 'cno-pos' : (r.ev < 0 ? 'cno-neg' : ''), `Juice ${cnoFmtPct(r.juice)}`);
+    // Order: Sharp EV% (the big one), QK, FBC, Fair odds
+    const evTile = tile('Sharp EV%', cnoFmtPct(r.ev, true), r.ev > 0 ? 'cno-pos' : (r.ev < 0 ? 'cno-neg' : ''), `Juice ${cnoFmtPct(r.juice)}`, 'cno-sharp-tile-main');
+    if (r.boostPct) { // the boost note goes on its own line under "Sharp EV%"
+      evTile.querySelector('.cno-sharp-tile-label').appendChild(cnoSharpEl('div', 'cno-sharp-tile-boost', `(${r.boostPct}% boost)`));
+    }
     const kLabel = cnoKellyLabel(mult);
-    tile(kLabel, kellyPct > 0 ? `${kellyPct.toFixed(2)}u` : '—', '',
+    const kTile = tile(kLabel, kellyPct > 0 ? `${kellyPct.toFixed(2)}u` : '—', '',
       kellyPct > 0 && !(bankroll > 0) ? 'Set a bankroll in CNO Settings' : (kellyPct > 0 ? ' ' : 'No bet'));
+    // Free bet conversion: what a free bet on this line is worth (as a % of the free bet)
+    tile('FBC', isFinite(r.fb) ? `${(r.fb * 100).toFixed(1)}%` : '—', '', '');
+    tile('Fair odds', cnoProbabilityToAmerican(r.fair) || '—', '', isFinite(r.fair) ? `${(r.fair * 100).toFixed(1)}% to hit` : '');
     // Bet size in dollars, with a show/hide eye (remembered)
     if (kellyPct > 0 && bankroll > 0) {
-      const sub = tiles.lastChild.querySelector('.cno-sharp-tile-sub');
+      const sub = kTile.querySelector('.cno-sharp-tile-sub');
       sub.textContent = '';
       sub.classList.add('cno-sharp-betsize');
-      const amount = cnoFmtMoney(kellyPct / 100 * bankroll);
-      const label = cnoSharpEl('span', '', '');
+      const amount = cnoFmtMoney(kellyPct / 100 * bankroll).replace(/\.\d+$/, ''); // whole dollars
+      const label = cnoSharpEl('span', 'cno-sharp-betsize-amt', '');
       const eye = cnoSharpEl('button', 'cno-sharp-eye');
       eye.type = 'button';
       const paint = () => {
-        label.textContent = `${kLabel} bet size ${cnoSharpShowBetSize ? amount : '—'}`;
+        label.textContent = cnoSharpShowBetSize ? amount : '$—';
         eye.innerHTML = cnoSharpShowBetSize ? CNO_SHARP_ICON_EYE : CNO_SHARP_ICON_EYE_OFF;
         eye.title = cnoSharpShowBetSize ? 'Hide bet size' : 'Show bet size';
       };
@@ -6616,14 +6760,248 @@ function cnoRenderSharpResult(body, r, defaults) {
 
   const foot = cnoSharpEl('div', 'cno-sharp-foot');
   foot.appendChild(cnoSharpEl('span', '', `${CNO_DEVIG_METHOD_NAMES[r.method] || r.method} · prices from ${r.readAt.toLocaleTimeString()}`));
+  const links = cnoSharpEl('span', 'cno-sharp-foot-links');
+  if (r.usable && isFinite(r.ev)) {
+    const copy = cnoSetIconLabel(cnoSharpEl('a', 'cno-sharp-open cno-sharp-copy'), 'discord', 'Copy for Discord');
+    copy.href = '#';
+    copy.title = 'Copy this result as a Discord post';
+    copy.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const done = (ok) => {
+        cnoSetIconLabel(copy, 'discord', ok ? 'Copied ✓' : 'Copy failed');
+        setTimeout(() => { if (copy.isConnected) cnoSetIconLabel(copy, 'discord', 'Copy for Discord'); }, 1600);
+      };
+      try {
+        navigator.clipboard.writeText(cnoSharpShareText(r)).then(() => done(true), () => done(false));
+      } catch (err) { done(false); }
+    });
+    links.appendChild(copy);
+  }
   if (r.deviggerUrl) {
     const a = cnoSetIconLabel(cnoSharpEl('a', 'cno-sharp-open'), 'devig', 'Open in Devigger', '↗');
     a.href = r.deviggerUrl;
     a.target = '_blank';
     a.rel = 'noopener';
-    foot.appendChild(a);
+    links.appendChild(a);
   }
+  foot.appendChild(links);
   body.appendChild(foot);
+}
+
+// ---------- shared pieces of the Discord copies ----------
+
+// "Today at 4:25 PM" / "Sat, Nov 28 · 12:30 PM" -> "Today @ 4:25PM ET" / "Sat Nov 28 @ 12:30PM ET"
+function cnoShareWhen(dateText) {
+  const t = String(dateText || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const m = t.match(/^(.*?)\s*(?:\bat\b|·|@)\s*(\d{1,2})(?::(\d{2}))?\s*([AP]M)$/i);
+  if (!m) return t;
+  const day = m[1].replace(/,/g, '').trim();
+  const time = `${m[2]}${m[3] && m[3] !== '00' ? ':' + m[3] : ''}${m[4].toUpperCase()}`;
+  let tz = '';
+  try {
+    tz = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(new Date()).find(p => p.type === 'timeZoneName').value;
+  } catch (e) { /* ignore */ }
+  const us = tz.match(/^([ECMP])[SD]T$/);
+  if (us) tz = `${us[1]}T`;
+  return `${day ? day + ' @ ' : ''}${time}${tz ? ' ' + tz : ''}`;
+}
+
+// Bet title: "1st Quarter Moneyline 3-way Draw" (market first for Draw / Over / Under / Yes /
+// No / numbers), otherwise "Las Vegas Raiders Moneyline" (bet first)
+function cnoShareBetTitle(betName, market) {
+  const bet = String(betName || '').replace(/\s+/g, ' ').trim();
+  const mkt = String(market || '').replace(/\s+/g, ' ').trim();
+  if (!mkt) return bet || 'Bet';
+  if (!bet) return mkt;
+  return /^(draw|tie|over|under|yes|no|odd|even|[+-]?\d)/i.test(bet) ? `${mkt} ${bet}` : `${bet} ${mkt}`;
+}
+
+// The heading, the event line, a blank line and the boost line (when there's a boost)
+function cnoShareHeaderLines(o) {
+  const book = String(o.book || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const title = `${cnoShareBetTitle(o.betName, o.market)} ${o.odds}`.trim().replace(/[[\]]/g, '');
+  const linked = o.url ? `**[${title}](<${o.url}>)**` : `**${title}**`;
+  const tag = o.boosted ? `boosted to ${o.boosted}` : (o.tag || '');
+  const lines = [`## ${book ? book + ': ' : ''}${linked}${tag ? `  *(${tag})*` : ''}`];
+  const sub = [o.event, cnoShareWhen(o.dateText)].filter(Boolean).join(' | ');
+  if (sub) lines.push(sub);
+  if (o.boosted) {
+    lines.push('');
+    lines.push(`${o.boostPct}% profit boost. ${o.odds} boosted to ${o.boosted}.`);
+  }
+  return lines;
+}
+
+function cnoShareKelly(fullUnits, fbText) {
+  const k = fullUnits > 0 ? fullUnits : 0;
+  return k > 0
+    ? `(Full=${k.toFixed(2)}u, 1/2=${(k / 2).toFixed(2)}u, 1/4=${(k / 4).toFixed(2)}u, FB = ${fbText})`
+    : `(No Kelly bet; FB = ${fbText})`;
+}
+
+function cnoShareFooterLines(deviggerUrl) {
+  const out = [];
+  if (deviggerUrl) out.push('', `[View/Edit Devig](<${deviggerUrl}>)`);
+  out.push('', `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
+  return out;
+}
+
+function cnoShareSignedOdds(o) {
+  const n = Number(String(o).replace('+', ''));
+  return isFinite(n) && n !== 0 ? `${n > 0 ? '+' : ''}${Math.round(n)}` : String(o || '');
+}
+
+// Profit-boosted American odds, or '' with no boost
+function cnoShareBoosted(odds, boostPct) {
+  const d = americanToDecimal(String(odds).replace('+', ''));
+  if (!(boostPct > 0) || !d) return '';
+  const bd = 1 + (d - 1) * (1 + boostPct / 100);
+  const a = bd >= 2 ? Math.round((bd - 1) * 100) : Math.round(-100 / (bd - 1));
+  return `${a > 0 ? '+' : ''}${a}`;
+}
+
+// "Copy for Discord": the sharp result as a post, in the Devigger's copy format. No dollar amounts.
+function cnoSharpShareText(r) {
+  const info = r.info;
+  const am = (p) => cnoProbabilityToAmerican(p) || '—';
+  const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
+  const odds = cnoShareSignedOdds(r.finalOdds);
+  const boosted = cnoShareBoosted(r.finalOdds, r.boostPct);
+  const lines = cnoShareHeaderLines({
+    book: info.bookName, betName: info.betName, market: info.market, odds, boosted, boostPct: r.boostPct,
+    url: info.betUrl, event: info.event, dateText: info.dateText
+  });
+  lines.push('', `Odds: ${boosted || odds}; **EV: ${pct1(r.ev)}**`, '');
+
+  // The sharp books
+  const weighted = r.mode === 'weighted';
+  const setName = info.set && info.set.key && info.set.key !== 'All' ? `${info.set.key} ` : '';
+  lines.push(`**${setName}Sharps** (${weighted ? 'weighted' : 'average'}, ${(CNO_DEVIG_METHOD_NAMES[r.method] || r.method).toLowerCase()}):`);
+  const priceOf = (b) => b.cells.map(c => c ? cnoShareSignedOdds(c.odds) : '—').join('/');
+  const codeW = Math.max(...r.books.map(b => (b.code || b.name).length));
+  const priceW = Math.max(...r.books.map(b => priceOf(b).length));
+  r.books.forEach(b => {
+    const code = (b.code || b.name).padEnd(codeW);
+    if (!b.usable) {
+      lines.push(`\`${code}  ${priceOf(b).padEnd(priceW)}  not used${b.reason ? `: ${b.reason}` : ''}\``);
+      return;
+    }
+    const w = weighted ? `  ${Math.round(b.share * 1000) / 10}%` : '';
+    const juice = b.juice !== undefined ? `  (${pct1(b.juice)} juice)` : '';
+    lines.push(`\`${code}  ${priceOf(b).padEnd(priceW)}  FV ${am(b.fair)}${juice}${w}\``);
+  });
+  lines.push('');
+
+  const parts = [`FV: ${am(r.fair)} (${pct1(r.fair)})`];
+  if (info.cnoFair) { const abbr = cnoDevigMethodAbbrev(); parts.push(`CNO${abbr ? ' ' + abbr : ''} FV: ${info.cnoFair}`); }
+  parts.push(cnoShareKelly(r.kellyFull, pct1(r.fb)));
+  lines.push(parts.join('; '));
+  return lines.concat(cnoShareFooterLines(r.deviggerUrl)).join('\n');
+}
+
+// ====================================================
+// CALC POPUP: "COPY FOR DISCORD"
+// Under the calculator's last line (above Close). Same format as the Sharp FV popup's copy, but
+// the fair odds and EV are CNO's. EV, Kelly and free bet conversion are worked out from CNO's
+// fair win chance and the odds (boosted when there's a boost); no dollar amounts.
+// ====================================================
+
+// CNO's devig method, abbreviated: "LW-WC" (Liquidity-Weighted - Worst-case), "LW-M", "UMC-P"...
+// From the table's EV% header (what the table was worked out with), else the Devig Method dropdown.
+function cnoDevigMethodAbbrev() {
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (table) {
+    for (const th of table.querySelectorAll('thead th')) {
+      const m = th.textContent.replace(/\s+/g, ' ').trim().match(/^(\S+)\s+EV%$/i);
+      if (m) return m[1];
+    }
+  }
+  const sel = document.querySelector('select[id$="DropDownListDevigMethod"]');
+  const text = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : '';
+  if (!text) return '';
+  const initials = (part) => part.split('/').map(seg => seg.split(/[\s-]+/).filter(Boolean).map(w => w[0].toUpperCase()).join('')).join('/');
+  return text.split(/\s+-\s+/).map(initials).join('-');
+}
+
+function cnoSyncCalcShare(table, data) {
+  let wrap = table.nextElementSibling && table.nextElementSibling.classList.contains('cno-calc-share') ? table.nextElementSibling : null;
+  if (!wrap) {
+    wrap = cnoSharpEl('div', 'cno-calc-share');
+    const a = cnoSetIconLabel(cnoSharpEl('a', 'cno-sharp-open cno-calc-share-btn'), 'discord', 'Copy for Discord');
+    a.href = '#';
+    a.title = "Copy this bet as a Discord post (CNO's fair odds)";
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const done = (ok) => {
+        cnoSetIconLabel(a, 'discord', ok ? 'Copied ✓' : 'Copy failed');
+        setTimeout(() => { if (a.isConnected) cnoSetIconLabel(a, 'discord', 'Copy for Discord'); }, 1600);
+      };
+      const betLink = wrap.parentNode && wrap.parentNode.querySelector('a.cno-calc-book-link');
+      const text = cnoCalcShareText(Object.assign({}, wrap._data, { betUrl: betLink ? betLink.href : '' }));
+      if (!text) { done(false); return; }
+      try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (err) { done(false); }
+    });
+    wrap.appendChild(a);
+    table.parentNode.insertBefore(wrap, table.nextSibling);
+  }
+  wrap._data = data;
+}
+
+// The promo calculators' type, reward and EV% ("Free Bet", "Risk-Free Bet", "Bet & Get Bet",
+// "Win & Get Bet"); null for a plain +EV calculator
+function cnoCalcPromoInfo(d) {
+  const type = String(d.promoType || '').toLowerCase();
+  const reward = String(d.reward || '').replace(/\s+/g, ' ').trim(); // "$100 (70%)"
+  const rm = reward.match(/^(\$[\d,.]+)\s*\(([\d.]+%)\)/);
+  const rewardText = rm ? `${rm[1].replace(/\.00$/, '')} @ ${rm[2]}` : reward;
+  const ev = String(d.promoEv || '').trim();
+  if (!ev) return null;
+  const ev1 = (() => { const n = parseFloat(ev); return isFinite(n) ? `${n.toFixed(1)}%` : ev; })();
+  if (/risk/.test(type)) return { tag: `RISK-FREE BET${rm ? `, ${rm[2]} conversion` : ''}`, label: 'RISK-FREE BET', ev: ev1 };
+  if (/bet\s*&\s*get/.test(type)) return { tag: `BET & GET${rewardText ? `, ${rewardText}` : ''}`, label: 'BET & GET', ev: ev1 };
+  if (/win\s*&\s*get/.test(type)) return { tag: `WIN & GET${rewardText ? `, ${rewardText}` : ''}`, label: 'WIN & GET', ev: ev1 };
+  if (/free bet/.test(type)) return { tag: 'FREE BET', label: 'FREE BET', ev: ev1 };
+  return null;
+}
+
+function cnoCalcShareText(d) {
+  if (!d) return '';
+  const dec = americanToDecimal(String(d.finalOdds).replace('+', ''));
+  const p = d.fairPct > 0 && d.fairPct < 1 ? d.fairPct : (americanToDecimal(d.fairOdds) ? 1 / americanToDecimal(d.fairOdds) : NaN);
+  if (!dec || !isFinite(p)) return '';
+  const pct1 = (x) => `${(x * 100).toFixed(1)}%`;
+  const odds = cnoShareSignedOdds(d.finalOdds);
+  const boostPct = parseFloat(d.boostVal) > 0 ? parseFloat(d.boostVal) : 0;
+  const boosted = cnoShareBoosted(d.finalOdds, boostPct);
+  const bd = boosted ? americanToDecimal(boosted.replace('+', '')) : dec;
+  const ev = p * bd - 1;
+  const kelly = Math.max(0, ev / (bd - 1)) * 100; // % of bankroll = units
+  const fb = p * (bd - 1);
+
+  // Promo pages (Free Bet, Risk-Free, Bet & Get, Win & Get): CNO's promo EV%, no Kelly
+  const promo = cnoCalcPromoInfo(d);
+  if (promo) {
+    const lines = cnoShareHeaderLines({
+      book: d.book, betName: d.betName, market: d.market, odds, tag: promo.tag,
+      url: d.betUrl, event: d.event, dateText: d.dateText
+    });
+    const abbr = cnoDevigMethodAbbrev();
+    lines.push('', `Odds: ${odds}; **${promo.label} EV: ${promo.ev}**`, '');
+    lines.push(`**CNO${abbr ? ' ' + abbr : ''}** FV: ${cnoShareSignedOdds(d.fairOdds)} (${pct1(p)})`);
+    return lines.concat(cnoShareFooterLines(d.deviggerUrl)).join('\n');
+  }
+
+  const lines = cnoShareHeaderLines({
+    book: d.book, betName: d.betName, market: d.market, odds, boosted, boostPct,
+    url: d.betUrl, event: d.event, dateText: d.dateText
+  });
+  lines.push('', `Odds: ${boosted || odds}; **EV: ${pct1(ev)}**`, '');
+  const abbr = cnoDevigMethodAbbrev();
+  lines.push(`**CNO${abbr ? ' ' + abbr : ''}** FV: ${cnoShareSignedOdds(d.fairOdds)} (${pct1(p)}); ${cnoShareKelly(kelly, pct1(fb))}`);
+  return lines.concat(cnoShareFooterLines(d.deviggerUrl)).join('\n');
 }
 
 // ====================================================
@@ -6832,3 +7210,494 @@ function cnoClearCalcBoost() {
     el.classList.remove('cno-boosted-val');
   });
 }
+
+// ====================================================
+// EVENT INJURY REPORT (NBA, WNBA, NFL, MLB)
+// A hover icon in the Event cell opens a popup listing each team's injured players from the
+// injury sheets (already loaded on their schedule). The sheets give teams as short names
+// ("NOP"); they're matched to the event's full team names with the list below.
+// ====================================================
+
+const CNO_INJURY_LEAGUES = ['NBA', 'WNBA', 'NFL', 'MLB'];
+
+// [short name, city, nickname]; extra short names some sources use are in CNO_TEAM_ALIASES
+const CNO_TEAMS = {
+  NBA: [['ATL', 'Atlanta', 'Hawks'], ['BKN', 'Brooklyn', 'Nets'], ['BOS', 'Boston', 'Celtics'], ['CHA', 'Charlotte', 'Hornets'],
+    ['CHI', 'Chicago', 'Bulls'], ['CLE', 'Cleveland', 'Cavaliers'], ['DAL', 'Dallas', 'Mavericks'], ['DEN', 'Denver', 'Nuggets'],
+    ['DET', 'Detroit', 'Pistons'], ['GSW', 'Golden State', 'Warriors'], ['HOU', 'Houston', 'Rockets'], ['IND', 'Indiana', 'Pacers'],
+    ['LAC', 'Los Angeles', 'Clippers'], ['LAL', 'Los Angeles', 'Lakers'], ['MEM', 'Memphis', 'Grizzlies'], ['MIA', 'Miami', 'Heat'],
+    ['MIL', 'Milwaukee', 'Bucks'], ['MIN', 'Minnesota', 'Timberwolves'], ['NOP', 'New Orleans', 'Pelicans'], ['NYK', 'New York', 'Knicks'],
+    ['OKC', 'Oklahoma City', 'Thunder'], ['ORL', 'Orlando', 'Magic'], ['PHI', 'Philadelphia', '76ers'], ['PHX', 'Phoenix', 'Suns'],
+    ['POR', 'Portland', 'Trail Blazers'], ['SAC', 'Sacramento', 'Kings'], ['SAS', 'San Antonio', 'Spurs'], ['TOR', 'Toronto', 'Raptors'],
+    ['UTA', 'Utah', 'Jazz'], ['WAS', 'Washington', 'Wizards']],
+  WNBA: [['ATL', 'Atlanta', 'Dream'], ['CHI', 'Chicago', 'Sky'], ['CON', 'Connecticut', 'Sun'], ['DAL', 'Dallas', 'Wings'],
+    ['GSV', 'Golden State', 'Valkyries'], ['IND', 'Indiana', 'Fever'], ['LVA', 'Las Vegas', 'Aces'], ['LAS', 'Los Angeles', 'Sparks'],
+    ['MIN', 'Minnesota', 'Lynx'], ['NYL', 'New York', 'Liberty'], ['PHO', 'Phoenix', 'Mercury'], ['PDX', 'Portland', 'Fire'],
+    ['SEA', 'Seattle', 'Storm'], ['TOR', 'Toronto', 'Tempo'], ['WAS', 'Washington', 'Mystics']],
+  NFL: [['ARI', 'Arizona', 'Cardinals'], ['ATL', 'Atlanta', 'Falcons'], ['BAL', 'Baltimore', 'Ravens'], ['BUF', 'Buffalo', 'Bills'],
+    ['CAR', 'Carolina', 'Panthers'], ['CHI', 'Chicago', 'Bears'], ['CIN', 'Cincinnati', 'Bengals'], ['CLE', 'Cleveland', 'Browns'],
+    ['DAL', 'Dallas', 'Cowboys'], ['DEN', 'Denver', 'Broncos'], ['DET', 'Detroit', 'Lions'], ['GB', 'Green Bay', 'Packers'],
+    ['HOU', 'Houston', 'Texans'], ['IND', 'Indianapolis', 'Colts'], ['JAX', 'Jacksonville', 'Jaguars'], ['KC', 'Kansas City', 'Chiefs'],
+    ['LAC', 'Los Angeles', 'Chargers'], ['LAR', 'Los Angeles', 'Rams'], ['LV', 'Las Vegas', 'Raiders'], ['MIA', 'Miami', 'Dolphins'],
+    ['MIN', 'Minnesota', 'Vikings'], ['NE', 'New England', 'Patriots'], ['NO', 'New Orleans', 'Saints'], ['NYG', 'New York', 'Giants'],
+    ['NYJ', 'New York', 'Jets'], ['PHI', 'Philadelphia', 'Eagles'], ['PIT', 'Pittsburgh', 'Steelers'], ['SEA', 'Seattle', 'Seahawks'],
+    ['SF', 'San Francisco', '49ers'], ['TB', 'Tampa Bay', 'Buccaneers'], ['TEN', 'Tennessee', 'Titans'], ['WAS', 'Washington', 'Commanders']],
+  MLB: [['AZ', 'Arizona', 'Diamondbacks'], ['ATL', 'Atlanta', 'Braves'], ['BAL', 'Baltimore', 'Orioles'], ['BOS', 'Boston', 'Red Sox'],
+    ['CHC', 'Chicago', 'Cubs'], ['CWS', 'Chicago', 'White Sox'], ['CIN', 'Cincinnati', 'Reds'], ['CLE', 'Cleveland', 'Guardians'],
+    ['COL', 'Colorado', 'Rockies'], ['DET', 'Detroit', 'Tigers'], ['HOU', 'Houston', 'Astros'], ['KC', 'Kansas City', 'Royals'],
+    ['LAA', 'Los Angeles', 'Angels'], ['LAD', 'Los Angeles', 'Dodgers'], ['MIA', 'Miami', 'Marlins'], ['MIL', 'Milwaukee', 'Brewers'],
+    ['MIN', 'Minnesota', 'Twins'], ['NYM', 'New York', 'Mets'], ['NYY', 'New York', 'Yankees'], ['ATH', '', 'Athletics'],
+    ['PHI', 'Philadelphia', 'Phillies'], ['PIT', 'Pittsburgh', 'Pirates'], ['SD', 'San Diego', 'Padres'], ['SF', 'San Francisco', 'Giants'],
+    ['SEA', 'Seattle', 'Mariners'], ['STL', 'St. Louis', 'Cardinals'], ['TB', 'Tampa Bay', 'Rays'], ['TEX', 'Texas', 'Rangers'],
+    ['TOR', 'Toronto', 'Blue Jays'], ['WSH', 'Washington', 'Nationals']]
+};
+const CNO_TEAM_ALIASES = {
+  NBA: { NY: 'NYK', GS: 'GSW', SA: 'SAS', NO: 'NOP', UTAH: 'UTA', WSH: 'WAS', PHO: 'PHX', BRK: 'BKN', CHO: 'CHA' },
+  WNBA: { LV: 'LVA', LA: 'LAS', NY: 'NYL', PHX: 'PHO', CONN: 'CON', WSH: 'WAS', GS: 'GSV' },
+  NFL: { WSH: 'WAS', JAC: 'JAX', LA: 'LAR', LVR: 'LV', OAK: 'LV', SD: 'LAC', GNB: 'GB', KAN: 'KC', NWE: 'NE', NOR: 'NO', SFO: 'SF', TAM: 'TB' },
+  MLB: { ARI: 'AZ', CHW: 'CWS', WAS: 'WSH', SDP: 'SD', SFG: 'SF', TBR: 'TB', KCR: 'KC', OAK: 'ATH', LV: 'ATH' }
+};
+
+function cnoTeamCode(league, code) {
+  const c = String(code || '').toUpperCase();
+  return (CNO_TEAM_ALIASES[league] && CNO_TEAM_ALIASES[league][c]) || c;
+}
+
+function cnoTeamFullName(league, code) {
+  const t = (CNO_TEAMS[league] || []).find(x => x[0] === cnoTeamCode(league, code));
+  return t ? [t[1], t[2]].filter(Boolean).join(' ') : code;
+}
+
+// "Golden State Warriors" -> "GSW" (matched on the nickname, so "LA Clippers" works too)
+function cnoTeamFromEventSide(league, side) {
+  const norm = (x) => ` ${String(x || '').toLowerCase().replace(/\(#\d+\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const s = norm(side);
+  const hit = (CNO_TEAMS[league] || []).find(t => s.includes(norm(t[2])));
+  return hit ? hit[0] : null;
+}
+
+const CNO_INJURY_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M12 9v5M9.5 11.5h5"/><path d="M9 17.5h6"/></svg>';
+
+function processEventInjuryIcons() {
+  if (!isCnoListPage()) return;
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  if (!table) return;
+  const on = typeof userSettings === 'undefined' || userSettings.enableInjuryBadges !== false;
+  if (!on) { table.querySelectorAll('.cno-injury-list-btn').forEach(b => b.remove()); return; }
+  const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const leagueIdx = heads.indexOf('league');
+  const eventIdx = heads.indexOf('event');
+  if (leagueIdx === -1 || eventIdx === -1) return;
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(row => {
+    const cell = row.children[eventIdx];
+    const leagueCell = row.children[leagueIdx];
+    if (!cell || !leagueCell) return;
+    const league = cnoCellText(leagueCell).toUpperCase();
+    const existing = cell.querySelector('.cno-injury-list-btn');
+    if (!CNO_INJURY_LEAGUES.includes(league)) { if (existing) existing.remove(); return; }
+    if (existing) return;
+    const btn = createHoverFilterBtn('Injury report for this game', () => cnoOpenInjuryPopup(btn, row, league), CNO_INJURY_ICON_SVG);
+    btn.classList.add('cno-injury-list-btn');
+    getHoverTray(cell).appendChild(btn);
+  });
+}
+
+const CNO_INJURY_SEVERITY = { OUT: 0, IL: 0, IR: 0, 'NFI-R': 0, PUP: 0, S: 0, D: 1, Q: 2, GTD: 2, D2D: 2, PROB: 3 };
+
+let cnoInjuryPopup = null;
+function cnoCloseInjuryPopup() {
+  if (cnoInjuryPopup) cnoInjuryPopup.remove();
+  cnoInjuryPopup = null;
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cnoInjuryPopup) cnoCloseInjuryPopup(); });
+document.addEventListener('mousedown', (e) => {
+  if (cnoInjuryPopup && !cnoInjuryPopup.contains(e.target) && !(e.target.closest && e.target.closest('.cno-injury-list-btn'))) cnoCloseInjuryPopup();
+}, true);
+
+function cnoOpenInjuryPopup(btn, row, league) {
+  cnoCloseInjuryPopup();
+  const table = row.closest('table');
+  const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const cellAt = (name) => { const i = heads.indexOf(name); return i >= 0 ? row.children[i] : null; };
+  const eventCell = cellAt('event');
+  const link = eventCell && eventCell.querySelector('a');
+  const eventText = link ? getCleanCellText(link) : getCleanCellText(eventCell);
+  const dateCell = cellAt('date');
+  let dateText = '';
+  if (dateCell) {
+    const day = dateCell.querySelector('.lh-day'), time = dateCell.querySelector('.lh-time');
+    dateText = day && time ? `${day.textContent.trim()} · ${time.textContent.trim()}` : getCleanCellText(dateCell).replace(/\s+at\s+/i, ' · ');
+  }
+
+  // Teams in the event, in the order shown (away @ home)
+  const teams = eventText.split(/\s+(?:@|vs\.?|v)\s+/i).map(sd => ({ side: sd.trim(), code: cnoTeamFromEventSide(league, sd) }));
+
+  // Everyone on the injury sheets for those teams
+  const byTeam = {};
+  const haveTeams = typeof injuryDataMap !== 'undefined' && Array.from(injuryDataMap.values()).some(v => v && v.team !== undefined);
+  if (haveTeams) {
+    injuryDataMap.forEach((v, key) => {
+      if (!key.startsWith(`${league}|`) || !v || !v.team) return;
+      const code = cnoTeamCode(league, v.team);
+      if (teams.some(t => t.code === code)) (byTeam[code] = byTeam[code] || []).push(v);
+    });
+  }
+
+  const el = cnoSharpEl('div', 'cno-sharp-popup cno-injury-popup');
+  el.setAttribute('role', 'dialog');
+  const head = cnoSharpEl('div', 'cno-sharp-head');
+  head.appendChild(cnoSharpEl('span', 'cno-sharp-title', 'Injury report'));
+  head.appendChild(cnoSharpEl('span', 'cno-sharp-tag', league));
+  head.appendChild(cnoSharpEl('span', 'cno-sharp-spacer'));
+  const close = cnoSharpEl('button', 'cno-sharp-iconbtn', '✕');
+  close.type = 'button';
+  close.title = 'Close';
+  close.addEventListener('click', cnoCloseInjuryPopup);
+  head.appendChild(close);
+  el.appendChild(head);
+  el.appendChild(cnoSharpEl('div', 'cno-sharp-event', [eventText, dateText].filter(Boolean).join('  ·  ')));
+  if (!haveTeams) el.appendChild(cnoSharpEl('div', 'cno-sharp-loading', 'The injury report is still loading. Try again in a moment.'));
+
+  teams.forEach(t => {
+    const list = (t.code && byTeam[t.code]) || [];
+    const th = cnoSharpEl('div', 'cno-inj-team');
+    th.appendChild(cnoSharpEl('span', '', t.code ? cnoTeamFullName(league, t.code) : t.side));
+    th.appendChild(cnoSharpEl('span', 'cno-inj-count', t.code ? (list.length ? `${list.length} listed` : '') : 'team not recognized'));
+    el.appendChild(th);
+    if (!t.code || !haveTeams) return;
+    if (!list.length) { el.appendChild(cnoSharpEl('div', 'cno-inj-none', 'No one listed')); return; }
+    list.sort((a, b) => ((CNO_INJURY_SEVERITY[a.status] ?? 4) - (CNO_INJURY_SEVERITY[b.status] ?? 4)) || String(a.rawName).localeCompare(String(b.rawName)))
+      .forEach(p => {
+        const r = cnoSharpEl('div', 'cno-inj-row');
+        r.appendChild(cnoSharpEl('span', 'cno-inj-name', p.rawName));
+        r.appendChild(cnoSharpEl('span', 'cno-inj-pos', p.pos || ''));
+        const info = (typeof STATUS_MAP !== 'undefined' && STATUS_MAP[p.status]) || null;
+        const badge = cnoSharpEl('span', 'cno-inj-badge', info ? info.label : (p.rawStatus || p.status));
+        badge.style.background = info ? info.bg : '#64748b';
+        r.appendChild(badge);
+        const ret = p.returnDate && !/^[\s-]*$/.test(p.returnDate) ? `back ${p.returnDate}` : '';
+        r.appendChild(cnoSharpEl('span', 'cno-inj-detail', [p.injury, ret].filter(Boolean).join(' · ')));
+        el.appendChild(r);
+      });
+  });
+  const ts = typeof latestInjuryTimestamp !== 'undefined' && latestInjuryTimestamp ? ` · injury report updated ${latestInjuryTimestamp}` : '';
+  el.appendChild(cnoSharpEl('div', 'cno-sharp-foot', `Worst status first${ts}`));
+
+  document.body.appendChild(el);
+  el._anchor = btn;
+  cnoInjuryPopup = el;
+  cnoPlaceSharpPopup(el, btn);
+}
+
+// ====================================================
+// CLOSE THE SHARP FV AND INJURY REPORT POPUPS ON UPDATE
+// Right when Update / Refresh is clicked (or its shortcut), and as a backstop whenever the row
+// a popup belongs to is gone (CNO redrew the table).
+// ====================================================
+
+function cnoCloseRowPopups() {
+  if (typeof cnoCloseSharpPopup === 'function') cnoCloseSharpPopup();
+  cnoCloseInjuryPopup();
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target && e.target.closest ? e.target.closest('[id*="ButtonUpdate"], #ButtonRefresh, #ButtonRefresh_Faux') : null;
+  if (t) cnoCloseRowPopups();
+}, true);
+
+// Opened from the Calc popup's "Custom Sharp EV": close it once the Calc popup has closed
+function cnoSharpCalcClosed() {
+  const st = cnoSharpPopupState;
+  if (!st || !st.fromCalc || !st.anchor) return false;
+  return !st.anchor.isConnected || st.anchor.offsetParent === null;
+}
+
+document.addEventListener('click', () => {
+  if (!cnoSharpPopupState || !cnoSharpPopupState.anchor) return;
+  setTimeout(() => { if (cnoSharpCalcClosed()) cnoCloseSharpPopup(); }, 50); // after CNO closes its popup
+});
+
+function processRowPopupsStillValid() {
+  if (cnoSharpPopupState && cnoSharpPopupState.btn && !cnoSharpPopupState.btn.isConnected) cnoCloseSharpPopup();
+  if (cnoSharpCalcClosed()) cnoCloseSharpPopup();
+  if (cnoInjuryPopup && cnoInjuryPopup._anchor && !cnoInjuryPopup._anchor.isConnected) cnoCloseInjuryPopup();
+}
+
+// ====================================================
+// CALC POPUP: BOOK NAME LINKS TO THE BET (+ hover QR button)
+// The popup's Book ("DraftKings") becomes the same link as the Sportsbook cell of the row the
+// popup is for, with a QR button on hover (the QR opens over the popup). Two-bet popups (Low
+// Hold, hedge) get it on both books. CNO rewrites the name each time the popup opens, so this
+// runs every pass and re-adds the link when needed.
+// ====================================================
+
+function processCalcBookLinks() {
+  const btn = cnoLastCalcBtn && cnoLastCalcBtn.isConnected ? cnoLastCalcBtn : null;
+  const spans = Array.from(document.querySelectorAll('span[id^="PopupCalc"][id$="SportsbookSite"]')).filter(s => s.offsetParent !== null);
+  if (!btn || !spans.length) return;
+  const row = btn.closest('tr');
+  const table = btn.closest('table');
+  if (!row || !table) return;
+  const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase());
+  const bookCol = heads.findIndex(h => h.includes('sportsbook') && !h.startsWith('hedge'));
+  const hedgeCol = heads.findIndex(h => h.includes('sportsbook') && h.startsWith('hedge'));
+  const nameCol = (hedge) => heads.findIndex(h => h.startsWith('hedge') === hedge && (h === 'bet name' || h === 'bet' || h.endsWith(' name')));
+  const oddsCol = (hedge) => heads.findIndex(h => h.startsWith('hedge') === hedge && h !== 'fair odds' && (h === 'odds' || h.endsWith(' odds')));
+  const textAt = (i) => (i >= 0 && row.children[i]) ? getCleanCellText(row.children[i]) : '';
+
+  spans.forEach(span => {
+    const isHedge = /(^|_)Hedge_/.test(span.id.replace(/^PopupCalc_/, '_')) || /HedgeTab_Hedge/.test(span.id);
+    const col = isHedge ? hedgeCol : bookCol;
+    const cell = col >= 0 ? row.children[col] : null;
+    const link = cell ? (cell.querySelector('a[href*="deeplink.aspx"]') || cell.querySelector('a[href]')) : null;
+    const existing = span.querySelector('a.cno-calc-book-link');
+    const name = existing ? existing.textContent : span.textContent.trim();
+    if (!link || !/^https?:/i.test(link.href) || !name || getCleanCellText(cell) !== name) {
+      if (existing) { span.textContent = name; span.classList.remove('cno-calc-book'); }
+      return;
+    }
+    if (existing && existing.getAttribute('href') === link.href) return;
+
+    span.textContent = '';
+    span.classList.add('cno-calc-book');
+    const a = document.createElement('a');
+    a.className = 'cno-calc-book-link';
+    a.href = link.href;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.title = `Open this bet at ${name}`;
+    a.textContent = name;
+    span.appendChild(a);
+    span.appendChild(createQrBtn(a, () => name, () => {
+      const popupText = (suffix) => { const el = document.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`); return el ? el.textContent.trim() : ''; };
+      return { event: popupText('EventName'), market: popupText('_Market'), betName: textAt(nameCol(isHedge)), odds: extractAmericanOdds(textAt(oddsCol(isHedge))) || textAt(oddsCol(isHedge)) };
+    }));
+  });
+}
+
+// ====================================================
+// DEVIGGER PAGE: QR BUTTON NEXT TO "COPY DEVIG'S URL"
+// Always visible; shows a QR code of the same link that button copies (CNO keeps it in a hidden
+// textarea). Re-added whenever the Devigger redraws its results.
+// ====================================================
+
+function processDeviggerQrButton() {
+  if (!/sportsbook_devigger\.aspx/i.test(window.location.pathname)) return;
+  document.querySelectorAll('button[onclick*="Textbox_DevigsURL"]').forEach(copyBtn => {
+    if (copyBtn.nextElementSibling && copyBtn.nextElementSibling.classList.contains('cno-devig-qr')) return;
+    const m = (copyBtn.getAttribute('onclick') || '').match(/CopyToClipboard\('([^']+)'\)/);
+    const getUrl = () => {
+      const box = m ? document.getElementById(m[1]) : null;
+      return box ? String(box.value || box.textContent || '').trim() : '';
+    };
+    const fakeLink = { get href() { return getUrl(); } };
+    const qr = createQrBtn(fakeLink, () => 'Devigger link', () => ({}));
+    qr.classList.remove('cno-hover-filter-btn'); // always visible here
+    qr.classList.add('cno-devig-qr');
+    qr.title = "Show a QR code for this devig's link";
+    copyBtn.insertAdjacentElement('afterend', qr);
+  });
+}
+
+// ====================================================
+// MLB: "EXCL. WEATHER" (rows only; shown when League is MLB)
+// Uses the same Rotowire weather data as the weather icons. Not remembered between page loads
+// (it's a per-search choice), but saved filters keep it and Clear Filters resets it.
+// ====================================================
+
+let cnoMlbWeatherFilter = 'all'; // 'all' | 'likely' | 'possible' (possible + likely)
+const CNO_MLB_WEATHER_OPTIONS = [
+  { value: 'all', label: 'Include All' },
+  { value: 'likely', label: 'Exclude Likely Delay/Rainout' },
+  { value: 'possible', label: 'Exclude Possible and Likely Delay/Rainout' }
+];
+
+function createMlbWeatherRow() {
+  const row = document.createElement('div');
+  row.className = 'cno-field';
+  row.id = 'cno-mlb-weather-row';
+  row.style.cssText = 'display:none; margin-top:4px;';
+  const label = document.createElement('label');
+  label.textContent = 'Excl. Weather';
+  label.title = 'Hides MLB games that Rotowire flags for a possible or likely delay/rainout. This hides rows CNO already returned; it does not change what CNO searches.';
+  const weatherHint = createRowsFilterHint();
+  weatherHint.style.marginLeft = '4px'; // room after the text (like Refine: Leagues)
+  label.appendChild(weatherHint);
+  const select = document.createElement('select');
+  select.id = 'cno-mlb-weather-select';
+  CNO_MLB_WEATHER_OPTIONS.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    select.appendChild(opt);
+  });
+  select.value = cnoMlbWeatherFilter;
+  select.addEventListener('change', () => setMlbWeatherFilter(select.value));
+  row.appendChild(label);
+  row.appendChild(select);
+  return row;
+}
+
+function setMlbWeatherFilter(value) {
+  cnoMlbWeatherFilter = CNO_MLB_WEATHER_OPTIONS.some(o => o.value === value) ? value : 'all';
+  const select = document.getElementById('cno-mlb-weather-select');
+  if (select && select.value !== cnoMlbWeatherFilter) select.value = cnoMlbWeatherFilter;
+  processMlbWeatherFilter();
+  if (typeof processRowStriping === 'function') processRowStriping();
+  if (typeof processHiddenRowsNote === 'function') processHiddenRowsNote();
+}
+
+function cnoIsMlbLeagueChosen() {
+  const dd = typeof getLeagueDropdown === 'function' ? getLeagueDropdown() : null;
+  const opt = dd && dd.options ? dd.options[dd.selectedIndex] : null;
+  return !!(opt && opt.textContent.trim().toUpperCase() === 'MLB');
+}
+
+function processMlbWeatherFilter() {
+  const row = document.getElementById('cno-mlb-weather-row');
+  const weatherOn = typeof userSettings === 'undefined' || userSettings.enableMlbWeather !== false;
+  const show = !!row && cnoIsMlbLeagueChosen() && weatherOn;
+  if (row) {
+    const want = show ? 'flex' : 'none';
+    if (row.style.display !== want) row.style.display = want;
+  }
+  const table = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1');
+  const active = show && cnoMlbWeatherFilter !== 'all' && !!table && isCnoListPage();
+  if (!active) {
+    document.querySelectorAll('.cno-weather-hidden').forEach(el => el.classList.remove('cno-weather-hidden'));
+    return;
+  }
+  const hideFor = cnoMlbWeatherFilter === 'likely' ? ['likely'] : ['possible', 'likely'];
+  table.querySelectorAll('tbody tr:not(.footable-row-detail)').forEach(r => {
+    const hide = hideFor.includes(r.dataset.cnoWeather);
+    r.classList.toggle('cno-weather-hidden', hide);
+    const next = r.nextElementSibling;
+    if (next && next.classList.contains('footable-row-detail')) next.classList.toggle('cno-weather-hidden', hide);
+  });
+}
+
+// ====================================================
+// LOW HOLD CALC POPUP: "COPY FOR DISCORD"
+// Under the popup's last row (ROI), above Close. Stakes are scaled to $100 on the first side
+// (said so in the post); the hold / ROI come from the two odds. Links to each bet and to
+// TheSpread's hedge calculator, filled in with the same stake and odds.
+// ====================================================
+
+const CNO_LH_ODDS_A_ID = 'ContentPlaceHolderMain_ContentPlaceHolderRight_TextBoxPopupCalc_LowHold_BetOdds';
+const CNO_LH_ODDS_B_ID = 'ContentPlaceHolderMain_ContentPlaceHolderRight_TextBoxPopupCalc_Hedge_BetOdds';
+
+function processLowHoldShare() {
+  const oddsA = document.getElementById(CNO_LH_ODDS_A_ID);
+  if (!oddsA || oddsA.offsetParent === null) return;
+  const table = oddsA.closest('table');
+  if (!table || !table.parentNode) return;
+  if (table.nextElementSibling && table.nextElementSibling.classList.contains('cno-calc-share')) return;
+  const wrap = cnoSharpEl('div', 'cno-calc-share');
+  const a = cnoSetIconLabel(cnoSharpEl('a', 'cno-sharp-open cno-calc-share-btn'), 'discord', 'Copy for Discord');
+  a.href = '#';
+  a.title = 'Copy this low hold as a Discord post (per $100 on the first side)';
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const done = (ok) => {
+      cnoSetIconLabel(a, 'discord', ok ? 'Copied ✓' : 'Copy failed');
+      setTimeout(() => { if (a.isConnected) cnoSetIconLabel(a, 'discord', 'Copy for Discord'); }, 1600);
+    };
+    const text = cnoLowHoldShareText();
+    if (!text) { done(false); return; }
+    try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (err) { done(false); }
+  });
+  wrap.appendChild(a);
+  table.parentNode.insertBefore(wrap, table.nextSibling);
+}
+
+// American odds as a "numerator-denominator" decimal-odds fraction (TheSpread's link format)
+function cnoSpreadOddsToken(am) {
+  const n = Number(String(am).replace('+', ''));
+  if (!isFinite(n) || Math.abs(n) < 100) return '';
+  const scale = Number.isInteger(n) ? 1 : 100;
+  const x = Math.round(Math.abs(n) * scale), h = 100 * scale;
+  return n > 0 ? `${x + h}-${h}` : `${x + h}-${x}`;
+}
+
+function cnoLowHoldShareText() {
+  const byId = (id) => document.getElementById(`ContentPlaceHolderMain_ContentPlaceHolderRight_${id}`) || document.getElementById(id);
+  const text = (id) => { const el = byId(id); return el ? (typeof getCleanCellText === 'function' ? getCleanCellText(el) : el.textContent).replace(/\s+/g, ' ').trim() : ''; };
+  const inA = document.getElementById(CNO_LH_ODDS_A_ID), inB = document.getElementById(CNO_LH_ODDS_B_ID);
+  if (!inA || !inB) return '';
+  const oddsA = cnoShareSignedOdds(inA.value.trim()), oddsB = cnoShareSignedOdds(inB.value.trim());
+  const dA = americanToDecimal(oddsA.replace('+', '')), dB = americanToDecimal(oddsB.replace('+', ''));
+  if (!dA || !dB) return '';
+
+  // Per $100 on the first side
+  const stakeA = 100, stakeB = stakeA * dA / dB;
+  const payout = stakeA * dA, cost = stakeA + stakeB, profit = payout - cost, roi = profit / cost;
+  const hold = 1 / dA + 1 / dB - 1;
+  const money = (n) => cnoFmtMoney(Math.round(n * 100) / 100).replace(/\.00$/, '');
+  const pct2 = (x) => `${(x * 100).toFixed(2)}%`;
+
+  const linkOf = (spanId) => { const el = byId(spanId); const l = el && el.querySelector('a.cno-calc-book-link'); return l ? l.href : ''; };
+  const side = (pre, odds, stake) => {
+    const book = text(`PopupCalc_${pre}_SportsbookSite`).replace(/\s*\([^)]*\)\s*$/, '');
+    const title = `${text(`PopupCalc_${pre}_BetName`)} ${odds}`.trim().replace(/[[\]]/g, '');
+    const url = linkOf(`PopupCalc_${pre}_SportsbookSite`);
+    return `${book ? book + ': ' : ''}${url ? `**[${title}](<${url}>)**` : `**${title}**`} · ${money(stake)}`;
+  };
+
+  const lines = [roi > 0 ? `## Arb: **+${pct2(roi)} ROI**` : `## Low Hold: **${pct2(hold)}**`];
+  const sub = [text('PopupCalc_EventName'), text('PopupCalc_Market'), cnoShareWhen(text('PopupCalc_Date'))].filter(Boolean).join(' | ');
+  if (sub) lines.push(sub);
+  lines.push('', side('LowHold', oddsA, stakeA), side('Hedge', oddsB, stakeB), '-# Stakes per $100 on the first side', '');
+  lines.push(`Payout ${money(payout)} · Cost ${money(cost)} · **Profit ${money(profit)} (ROI ${roi > 0 ? '+' : ''}${pct2(roi)})**`);
+  const o = cnoSpreadOddsToken(oddsA), h = cnoSpreadOddsToken(oddsB);
+  if (o && h) lines.push('', `[Open in Hedge Calculator](<https://www.thespread.com/betting-tools/hedge-calculator/#f=a&m=eq&s=${stakeA}&o=${o}&h=${h}>)`);
+  lines.push('', `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
+  return lines.join('\n');
+}
+
+// ====================================================
+// SITE MENU: OPEN ON HOVER
+// The top menu's General / Tools / Calculators open on click (the site toggles "submenu-active").
+// With a mouse on the full-width layout, they open on hover instead, using the site's own class
+// (so they look the same) and close a moment after the pointer leaves. A click on the heading
+// while it's hover-opened leaves it open. Phones / narrow layouts keep the site's click menu.
+// ====================================================
+
+(function cnoSetupHoverMenus() {
+  // Full-width layout: the site hides its hamburger (.toggle) there; on the phone layout it shows
+  const isWide = () => {
+    const t = document.querySelector('nav ul.menu > li.toggle');
+    return !t || getComputedStyle(t).display === 'none';
+  };
+  const setup = () => {
+    const menu = document.querySelector('nav ul.menu');
+    if (!menu || menu.dataset.cnoHover) return;
+    menu.dataset.cnoHover = '1';
+    menu.querySelectorAll(':scope > li.has-submenu').forEach(item => {
+      let timer = null;
+      item.addEventListener('mouseenter', () => {
+        if (!isWide()) return;
+        clearTimeout(timer);
+        menu.querySelectorAll(':scope > li.submenu-active').forEach(o => { if (o !== item) o.classList.remove('submenu-active'); });
+        item.classList.add('submenu-active');
+        item.dataset.cnoHoverOpen = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        if (!item.dataset.cnoHoverOpen) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          item.classList.remove('submenu-active');
+          delete item.dataset.cnoHoverOpen;
+        }, 250); // time to cross the gap down to the submenu
+      });
+      // The site's click toggle would close a hover-opened menu: skip it for the heading itself
+      item.addEventListener('click', (e) => {
+        if (!item.dataset.cnoHoverOpen || !item.classList.contains('submenu-active')) return;
+        if (e.target.closest('.submenu')) return; // links in the submenu work as normal
+        e.stopImmediatePropagation();
+      }, true);
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
+  else setup();
+})();

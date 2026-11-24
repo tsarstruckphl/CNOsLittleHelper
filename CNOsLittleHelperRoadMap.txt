@@ -2,16 +2,13 @@ Planned Improvements
 --------------------
 
 (+) Ability to switch default devigger to hedgecalc instead of CNO
-(+) MLB weather filter 
-(+) Ability to backup and import settings/saved filters 
 (+) Ability to export and import CNO settings (not extension settings)
 (+) Ability to multi-select bets to send to devigger, create multi-bet QR codes, and potentially show EV%/FV, add boost
+Bug fix: Parlay Buddy color compatibility
 
 Possible Improvements
 ---------------------
 
-(-) Ability to add a profit boost to Positive EV's Calc Box
 (-) NFL weather icons
-(-) Game odds page: custom sharp book FV (note to self: think about minimum 
-(-) Game odds page: sorting by EV % (and custom sharp book EV%?)
-(-) Modernized main tables
+
+(-) Coloring of EV% in tables?

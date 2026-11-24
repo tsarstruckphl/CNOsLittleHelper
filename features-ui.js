@@ -102,6 +102,21 @@ function updateDeviggerLink(popup) {
     fairOdds = getOwnText(fairEl).replace('+', '').trim();
     if (!/^-?\d+$/.test(fairOdds)) fairOdds = '';
   }
+  // Promo calculators (Free Bet, Risk-Free, Bet & Get, Win & Get) show Hit% (the fair win chance)
+  // instead of Fair Odds; the fair odds follow from it (its exact value is in a "percentage" attribute)
+  let hitPct = NaN;
+  const hitEl = !fairOdds ? activeTab.querySelector('#PopupCalc_EVTab_FairPercentage') : null;
+  if (hitEl) {
+    hitPct = parseFloat(hitEl.getAttribute('percentage'));
+    if (!(hitPct > 0 && hitPct < 1)) hitPct = parseFloat(getOwnText(hitEl).replace(/[^0-9.]/g, '')) / 100;
+    if (hitPct > 0 && hitPct < 1) {
+      const dec = 1 / hitPct;
+      const am = dec >= 2 ? (dec - 1) * 100 : -100 / (dec - 1);
+      fairOdds = String(Math.round(am)); // whole odds, like CNO's Fair Odds
+    } else {
+      hitPct = NaN;
+    }
+  }
 
   if (!fairOdds) {
     popup.querySelectorAll('.cno-devigger-link').forEach(el => el.remove());
@@ -147,7 +162,7 @@ function updateDeviggerLink(popup) {
     const el = activeTab.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`) || popup.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`);
     return el ? getOwnText(el).trim() : '';
   };
-  const legOdds = cnoBuildDeviggerLegOdds(fairOdds, popupText('EventName'), popupText('_Market'), popupText('BetName'));
+  const legOdds = cnoBuildDeviggerLegOdds(fairOdds, popupText('EventName'), popupText('_Market'), popupText('BetName'), popupText('SportLeague'));
 
   let deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(legOdds)}&FinalOdds=${encodeURIComponent(finalOdds)}`;
   if (boostVal) {
@@ -185,6 +200,23 @@ function updateDeviggerLink(popup) {
   // "Custom Sharp EV" to its right (filter-ui.js), when that row has a sharp-book set
   if (typeof cnoSyncCalcSharpBtn === 'function') cnoSyncCalcSharpBtn(linkContainer);
   if (typeof cnoSyncCalcBoost === 'function') cnoSyncCalcBoost(linkContainer, fairOdds, finalOdds);
+  // "Copy for Discord" under the calculator's last line (filter-ui.js)
+  if (typeof cnoSyncCalcShare === 'function') {
+    const fairEl = activeTab.querySelector('#PopupCalc_EVTab_FairOdds, #PopupCalc_FairOdds');
+    const textOf = (suffix) => {
+      const el = activeTab.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`) || popup.querySelector(`[id^="PopupCalc"][id$="${suffix}"]`);
+      if (!el) return '';
+      return (typeof getCleanCellText === 'function' ? getCleanCellText(el) : el.textContent).replace(/\s+/g, ' ').trim();
+    };
+    cnoSyncCalcShare(table, {
+      fairOdds, finalOdds, boostVal, deviggerUrl,
+      fairPct: fairEl ? parseFloat(fairEl.getAttribute('percentage')) : hitPct,
+      promoType: hitEl ? textOf('EVTab_Type') : '', promoEv: hitEl ? textOf('EVTab_EVPercentage') : '',
+      reward: hitEl ? textOf('EVTab_Reward') : '',
+      event: textOf('EventName'), market: textOf('_Market'), betName: textOf('BetName'), dateText: textOf('_Date'),
+      book: textOf('SportsbookSite').replace(/\s*\([^)]*\)\s*$/, '')
+    });
+  }
 }
 
 function injectModalBadges() {
@@ -355,6 +387,12 @@ function addGameDeviggerCheckbox() {
   deepLinksLabel.parentNode.insertBefore(wrapper, deepLinksLabel.nextSibling);
 }
 
+// Game page: "Hockey - NHL" (for the Devigger comment's team abbreviations)
+function cnoGamePageLeague() {
+  const el = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_LabelSportLeague');
+  return el ? el.textContent.trim() : '';
+}
+
 function setupGameRightClickDevigger() {
   if (!window.location.pathname.toLowerCase().includes('game.aspx')) return;
 
@@ -421,7 +459,8 @@ function setupGameRightClickDevigger() {
       fairOdds,
       gameEventEl ? gameEventEl.textContent : '',
       gameMarketEl && gameMarketEl.selectedIndex >= 0 ? gameMarketEl.options[gameMarketEl.selectedIndex].text : '',
-      nameCell && typeof getCleanCellText === 'function' ? getCleanCellText(nameCell) : (nameCell ? nameCell.textContent : '')
+      nameCell && typeof getCleanCellText === 'function' ? getCleanCellText(nameCell) : (nameCell ? nameCell.textContent : ''),
+      typeof cnoGamePageLeague === 'function' ? cnoGamePageLeague() : ''
     );
 
     const deviggerUrl = `http://crazyninjamike.com/Public/sportsbooks/sportsbook_devigger.aspx?autofill=1&LegOdds=${encodeURIComponent(legOdds)}&FinalOdds=${encodeURIComponent(cellOdds)}`;
@@ -445,9 +484,11 @@ function setupGameRightClickDevigger() {
     const menuItem = document.createElement('a');
     menuItem.href = deviggerUrl;
     menuItem.target = '_blank';
-    menuItem.textContent = '⚡ Devig to FV';
+    menuItem.innerHTML = `${cnoIconSvg('devig', 14)}<span>Devig to FV</span>`;
     menuItem.style.cssText = `
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 6px;
       padding: 6px 12px;
       color: #0369a1;
       font-weight: 600;
@@ -861,13 +902,15 @@ function processGameBookColumns() {
 // rows matches, so the other side(s) of a line always come along.
 // ====================================================
 
-let cnoGameColFilter = null; // { code, mode: 'best' | 'fv' | 'either' }
+let cnoGameColFilter = null; // { code, mode: 'nonblank' | 'best' | 'fv' | 'either' | 'ev' }
 
 const GAME_FILTER_MODES = [
   { mode: 'nonblank', label: 'Refine to non-blank', short: 'Non-blank' },
   { mode: 'best', label: 'Refine to Best Odds', short: 'Best Odds' },
   { mode: 'fv', label: 'Refine to >= FV', short: '>= FV' },
-  { mode: 'either', label: 'Refine to Best Odds or >= FV', short: 'Best Odds or >= FV' }
+  { mode: 'either', label: 'Refine to Best Odds or >= FV', short: 'Best Odds or >= FV' },
+  // Not a refine: adds a "<BOOK> EV%" column and sorts by it (high to low); no rows are hidden
+  { mode: 'ev', label: 'Sort by EV %', short: 'EV %' }
 ];
 
 function getGameTable() {
@@ -879,6 +922,7 @@ function getGameColumns(table) {
   const ths = Array.from(table.querySelectorAll('thead th'));
   const cols = { betName: -1, best: -1, fair: -1, books: [] };
   ths.forEach((th, i) => {
+    if (th.classList.contains('cno-ev-col')) return; // the extension's "<BOOK> EV%" column
     const txt = th.textContent.replace(/\s+/g, ' ').trim();
     const low = txt.toLowerCase();
     if (low === 'bet name') cols.betName = i;
@@ -919,6 +963,28 @@ function getGameDataRows(table) {
 
 function setGameColFilter(code, mode) {
   cnoGameColFilter = { code, mode };
+  // Sorting by EV % turns "Pair 2-/3-way lines" off (pairs would break up the sort)
+  if (mode === 'ev') {
+    if (cnoGamePairLines) {
+      cnoGamePairLines = false;
+      try { chrome.storage.local.set({ [CNO_GAME_PAIR_KEY]: false }); } catch (e) { /* ignore */ }
+      const bar = document.getElementById('cno-gt-toolbar');
+      if (bar) bar.remove(); // rebuilt with the toggle shown off
+    }
+    processGameColFilter();
+    processGameTableModern();
+    processGameRowOrdering();
+    // Bring the top (highest EV) row into view, with the table header and banner above it
+    const table = getGameTable();
+    const first = table && getGameDataRows(table)[0];
+    if (first) {
+      const head = table.querySelector('thead');
+      const headH = head ? head.getBoundingClientRect().height : 0;
+      const y = first.getBoundingClientRect().top + window.scrollY - headH - 70;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+    return;
+  }
   // Filtering turns "Pair 2-/3-way lines" on (if the table restyle is on), so each kept line
   // shows next to its other side(s). The user can switch pairing back off from the toolbar.
   if (typeof isGameTableModern === 'function' && isGameTableModern() && !cnoGamePairLines) {
@@ -935,6 +1001,50 @@ function setGameColFilter(code, mode) {
 function clearGameColFilter() {
   cnoGameColFilter = null;
   processGameColFilter();
+  processGameTableModern();
+  processGameRowOrdering();
+}
+
+// EV% for one book on each row, from that book's odds and the row's Fair Odds:
+// EV = fair win chance x decimal odds - 1
+function cnoGameRowEv(row, cols, book) {
+  if (!book || cols.fair === -1) return null;
+  const v = cellOdds(row.children[book.idx]);
+  const fair = cellOdds(row.children[cols.fair]);
+  const dv = v ? americanToDecimal(v) : null;
+  const df = fair ? americanToDecimal(fair) : null;
+  if (!dv || !df) return null;
+  return dv / df - 1;
+}
+
+// The "<BOOK> EV%" column, right after Fair Odds
+function cnoUpdateGameEvColumn(table, cols, book) {
+  const code = cnoGameColFilter ? cnoGameColFilter.code : '';
+  const anchorIdx = cols.fair !== -1 ? cols.fair : (cols.best !== -1 ? cols.best : cols.betName);
+  const headerRow = cols.betName !== -1 ? table.querySelectorAll('thead th')[cols.betName].parentNode : null;
+  if (!headerRow || anchorIdx === -1) return;
+  let th = headerRow.querySelector('th.cno-ev-col');
+  if (!th) {
+    th = document.createElement('th');
+    th.className = 'cno-ev-col';
+    headerRow.insertBefore(th, headerRow.children[anchorIdx + 1] || null);
+  }
+  const title = `${code} EV%`;
+  if (th.textContent !== title) th.textContent = title;
+  getGameDataRows(table).forEach(row => {
+    let td = row.querySelector(':scope > td.cno-ev-col');
+    if (!td) {
+      td = document.createElement('td');
+      td.className = 'cno-ev-col';
+      row.insertBefore(td, row.children[anchorIdx + 1] || null);
+    }
+    const ev = cnoGameRowEv(row, cols, book);
+    row.dataset.cnoEv = ev === null ? '' : String(ev);
+    const text = ev === null ? '' : `${ev > 0 ? '+' : ''}${(ev * 100).toFixed(2)}%`;
+    if (td.textContent !== text) td.textContent = text;
+    td.classList.toggle('cno-ev-pos', ev !== null && ev > 0);
+    td.classList.toggle('cno-ev-neg', ev !== null && ev < 0);
+  });
 }
 
 function processGameColFilter() {
@@ -945,6 +1055,7 @@ function processGameColFilter() {
     if (!cnoGameColFilter) {
       if (banner) banner.remove();
       document.querySelectorAll('.cno-game-hidden').forEach(el => el.classList.remove('cno-game-hidden'));
+      document.querySelectorAll('.cno-ev-col').forEach(el => el.remove());
     }
     return;
   }
@@ -953,6 +1064,16 @@ function processGameColFilter() {
   const book = cols.books.find(b => b.code === cnoGameColFilter.code);
   const rows = getGameDataRows(table);
   const groupSize = /3-way/i.test(getGameMarketName()) ? 3 : 2;
+
+  // Sort by EV %: nothing is hidden; the "<BOOK> EV%" column is added (rows are ordered in
+  // processGameRowOrdering)
+  const evMode = cnoGameColFilter.mode === 'ev';
+  if (evMode) {
+    table.querySelectorAll('.cno-game-hidden').forEach(el => el.classList.remove('cno-game-hidden'));
+    cnoUpdateGameEvColumn(table, cols, book);
+  } else {
+    table.querySelectorAll('.cno-ev-col').forEach(el => el.remove());
+  }
 
   const rowMatches = (row) => {
     if (!book) return false;
@@ -971,7 +1092,7 @@ function processGameColFilter() {
 
   const groups = groupGameRows(rows, cols, groupSize); // row order is handled by processGameRowOrdering()
 
-  for (const group of groups) {
+  if (!evMode) for (const group of groups) {
     const keep = group.some(rowMatches);
     group.forEach(row => {
       row.classList.toggle('cno-game-hidden', !keep);
@@ -1014,7 +1135,9 @@ function processGameColFilter() {
     banner.appendChild(cell);
   }
   const modeInfo = GAME_FILTER_MODES.find(m => m.mode === cnoGameColFilter.mode);
-  const text = `Refined to ${getGameBookFullName(cnoGameColFilter.code)}: ${modeInfo ? modeInfo.short : ''}`;
+  const text = evMode
+    ? `Sorted by ${cnoGameColFilter.code} EV% (${getGameBookFullName(cnoGameColFilter.code)})`
+    : `Refined to ${getGameBookFullName(cnoGameColFilter.code)}: ${modeInfo ? modeInfo.short : ''}`;
   const label = banner.querySelector('.cno-game-filter-label');
   if (label.textContent !== text) label.textContent = text;
 
@@ -1028,39 +1151,66 @@ function processGameColFilter() {
 
 // Groups a line with its other side(s). Rows aren't always in neat pairs (a line can be missing
 // its partner), so group by content instead of position:
-//   1) same name once Over/Under/Yes/No and the number are removed, plus the same |number|
-//      ("Zach Edey Over 7.5" + "Zach Edey Under 7.5", "Over 145.5" + "Under 145.5")
-//   2) leftovers with the same |number| ("Sixers +4.5" + "Pacers -4.5"); with no number,
-//      all leftovers together (moneyline sides, or Home/Tie/Away in a 3-way market)
+//   1) Over/Under/Yes/No lines: same name once that word and the number are removed, plus the
+//      same |number| ("Zach Edey Over 7.5" + "Zach Edey Under 7.5", "Over 145.5" + "Under 145.5")
+//   2) spreads: the same |number| with opposite signs on two different teams
+//      ("Utah Mammoth -1.5" + "Anaheim Ducks +1.5"; never "Utah Mammoth -1.5" + "Utah Mammoth +1.5")
+//   3) lines with no number: all together (moneyline sides, or Home/Tie/Away in a 3-way market)
 function groupGameRows(rows, cols, groupSize) {
   const info = rows.map(row => {
     const nameCell = cols.betName !== -1 ? row.children[cols.betName] : row.children[0];
     const name = nameCell ? getCleanCellText(nameCell) : '';
     const m = name.match(/([+-]?\d+(?:\.\d+)?)\s*$/);
+    const signed = m ? m[1] : '';
     const num = m ? String(Math.abs(parseFloat(m[1]))) : '';
-    const residual = name
-      .replace(/([+-]?\d+(?:\.\d+)?)\s*$/, '')
-      .replace(/\b(over|under|yes|no)\b/gi, '')
-      .replace(/\s+/g, ' ').trim().toLowerCase();
-    return { row, key: `${residual}|${num}`, num };
-  });
-
-  const byKey = new Map();
-  info.forEach(x => {
-    if (!byKey.has(x.key)) byKey.set(x.key, []);
-    byKey.get(x.key).push(x);
+    const sign = !m ? '' : (signed.startsWith('-') ? '-' : (signed.startsWith('+') ? '+' : ''));
+    const noNumber = name.replace(/([+-]?\d+(?:\.\d+)?)\s*$/, '');
+    const hasOU = /\b(over|under|yes|no)\b/i.test(noNumber);
+    const residual = noNumber.replace(/\b(over|under|yes|no)\b/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    return { row, residual, num, sign, hasOU };
   });
 
   const groups = [];
-  const leftovers = new Map();
-  byKey.forEach(list => {
-    if (list.length >= 2) groups.push(list.map(x => x.row));
-    else list.forEach(x => {
-      if (!leftovers.has(x.num)) leftovers.set(x.num, []);
-      leftovers.get(x.num).push(x.row);
+  const used = new Set();
+
+  // 1) Over/Under, Yes/No
+  const byKey = new Map();
+  info.filter(x => x.hasOU).forEach(x => {
+    const key = `${x.residual}|${x.num}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(x);
+  });
+  byKey.forEach(list => { groups.push(list.map(x => x.row)); list.forEach(x => used.add(x)); });
+
+  // 2) Spreads: pair each - line with the nearest + line of the same size on another team
+  const byNum = new Map();
+  info.filter(x => !used.has(x) && x.num !== '' && x.sign).forEach(x => {
+    if (!byNum.has(x.num)) byNum.set(x.num, []);
+    byNum.get(x.num).push(x);
+  });
+  byNum.forEach(list => {
+    const minus = list.filter(x => x.sign === '-');
+    const plus = list.filter(x => x.sign === '+');
+    minus.forEach(a => {
+      const ai = info.indexOf(a);
+      let best = null, bestDist = Infinity;
+      plus.forEach(b => {
+        if (used.has(b) || b.residual === a.residual) return;
+        const d = Math.abs(info.indexOf(b) - ai);
+        if (d < bestDist) { best = b; bestDist = d; }
+      });
+      if (best) {
+        const pair = [a, best].sort((x, y) => info.indexOf(x) - info.indexOf(y));
+        groups.push(pair.map(x => x.row));
+        used.add(a); used.add(best);
+      }
     });
   });
-  leftovers.forEach(list => groups.push(list));
+
+  // 3) Everything else: no-number lines together; anything still unmatched on its own
+  const noNum = info.filter(x => !used.has(x) && x.num === '');
+  if (noNum.length) { groups.push(noNum.map(x => x.row)); noNum.forEach(x => used.add(x)); }
+  info.filter(x => !used.has(x)).forEach(x => groups.push([x.row]));
   return groups;
 }
 
@@ -1621,9 +1771,9 @@ function processGameTableModern() {
     th.classList.toggle('lh-name', i === cols.betName);
   });
 
-  // Which book columns have any odds
+  // Which book columns have any odds in the rows being shown (a refine can hide the rest)
   const hasOdds = new Set();
-  rows.forEach(row => {
+  rows.filter(r => !r.classList.contains('cno-game-hidden')).forEach(row => {
     cols.books.forEach(({ idx }) => {
       const cell = row.children[idx];
       if (cell && cellOdds(cell)) hasOdds.add(idx);
@@ -1667,6 +1817,32 @@ function processGameRowOrdering() {
   const table = getGameTable();
   if (!table) return;
   const rows = getGameDataRows(table);
+
+  // Sort by EV %: highest first; rows with no EV for that book keep their order at the bottom
+  if (isGameTableModern() && cnoGameColFilter && cnoGameColFilter.mode === 'ev') {
+    rows.forEach((row, i) => { if (row.dataset.cnoOrigIndex === undefined) row.dataset.cnoOrigIndex = String(i); });
+    const evOf = (r) => { const v = parseFloat(r.dataset.cnoEv); return isFinite(v) ? v : null; };
+    const sorted = rows.slice().sort((a, b) => {
+      const ea = evOf(a), eb = evOf(b);
+      if (ea === null && eb === null) return +a.dataset.cnoOrigIndex - +b.dataset.cnoOrigIndex;
+      if (ea === null) return 1;
+      if (eb === null) return -1;
+      return (eb - ea) || (+a.dataset.cnoOrigIndex - +b.dataset.cnoOrigIndex);
+    });
+    const tbody = table.querySelector('tbody');
+    if (tbody && !rows.every((r, i) => r === sorted[i])) {
+      sorted.forEach(row => {
+        const detail = row.nextElementSibling && row.nextElementSibling.classList.contains('footable-row-detail') ? row.nextElementSibling : null;
+        tbody.appendChild(row);
+        if (detail) tbody.appendChild(detail);
+      });
+    }
+    rows.forEach(r => r.classList.remove('lh-band-a', 'lh-band-b', 'lh-group-end'));
+    table.classList.remove('lh-paired');
+    if (cnoCanRevealGameTable()) table.classList.add('lh-ready');
+    return;
+  }
+
   const pairing = isGameTableModern() && cnoGamePairLines;
 
   if (!pairing) {

@@ -31,6 +31,9 @@ processUpdateBannerAlert(); // Added update banner check
   setupGameRightClickDevigger();
   processOddsTable();
   processCalcPopup();
+  processCalcBookLinks();
+  processLowHoldShare();
+  processDeviggerQrButton();
   processInjuryBadges();
   processPlayerTableRefreshTimestamp();
   processAPRankings();
@@ -41,6 +44,8 @@ processUpdateBannerAlert(); // Added update banner check
   processModernSpacing();
   processPendingFilterApply();
   processEventFilterIcons();
+  processEventInjuryIcons();
+  processRowPopupsStillValid();
   processCellFilterIcons();
   processSportsbookQrButtons();
   processMainTableModern();
@@ -48,8 +53,8 @@ processUpdateBannerAlert(); // Added update banner check
   processInjuredRowExclusion();
   processExcludePlayerUnders();
   processMultiLeagueFilter();
+  processMlbWeatherFilter();
   processHiddenRowsNote();
-  processRowStriping();
   processUnusedExtraColumn();
   processGameBookColumns();
   processGameHeaderFilterMenus();
@@ -67,7 +72,12 @@ processUpdateBannerAlert(); // Added update banner check
   processBoostAutoFocus();
 }
 
-setInterval(runAll, 500);
+// Every half second while the tab is visible; a background tab waits and catches up the moment
+// it's shown again
+setInterval(() => { if (!document.hidden) runAll(); }, 500);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && typeof userSettingsLoaded !== 'undefined' && userSettingsLoaded) runAll();
+});
 
 // Run as soon as the page has been read in full (the filter panel waits for that), instead of
 // waiting for the next half-second tick
