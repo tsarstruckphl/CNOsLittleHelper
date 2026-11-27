@@ -1,3 +1,18 @@
+1.2.5
+FEATURE ADDITIONS:
+
+-- EV Bet Slip (Positive EV page): add bets to a bet slip with an option to add profit boost and place the parlay bet via link or QR code
+    -Add bets with the + next to a bet's EV% or name, or from the Calc popup
+    -Shows combined odds, EV%, QK, FBC and fair odds, with an optional profit boost
+    -EV from CNO's fair odds, or from your custom sharp books
+    -One sportsbook per slip; same game parlays are flagged and their EV isn't shown (but can still generate bet links)
+    -Open the whole parlay at the book, show a QR code, open it in the Devigger, or copy it for Discord
+    -Kept until you clear it (shortcut Ctrl+Alt+S), and updates quietly as the table's odds change
+-- Reorganized Options page
+--Various design and layout improvements
+
+Various minor fixes
+
 1.2.4
 FEATURE ADDITIONS:
 --Injury report icon in the Event column (NBA, WNBA, NFL, MLB rows): opens a popup listing each team's injured players with position, status, injury and expected return, worst status first
