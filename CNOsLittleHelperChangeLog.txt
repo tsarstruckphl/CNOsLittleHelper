@@ -11,8 +11,6 @@ FEATURE ADDITIONS:
 -- Reorganized Options page
 --Various design and layout improvements
 
-Various minor fixes
-
 1.2.4
 FEATURE ADDITIONS:
 --Injury report icon in the Event column (NBA, WNBA, NFL, MLB rows): opens a popup listing each team's injured players with position, status, injury and expected return, worst status first
