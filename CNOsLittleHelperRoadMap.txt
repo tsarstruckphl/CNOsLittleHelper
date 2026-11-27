@@ -2,13 +2,11 @@ Planned Improvements
 --------------------
 
 (+) Ability to switch default devigger to hedgecalc instead of CNO
-(+) Ability to export and import CNO settings (not extension settings)
-(+) Ability to multi-select bets to send to devigger, create multi-bet QR codes, and potentially show EV%/FV, add boost
+(+) ability to send filters to "Share Filter" URLs (and possibly import from them?)
 Bug fix: Parlay Buddy color compatibility
 
 Possible Improvements
 ---------------------
 
 (-) NFL weather icons
-
 (-) Coloring of EV% in tables?
