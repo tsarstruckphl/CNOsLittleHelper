@@ -13,8 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     modernizeGameTable: true,
     modernizeMainTables: true,
     mainTableDensity: 'standard',
-    customSharpDevig: false,
-    excludePlayerUndersDefault: false
+    customSharpDevig: true,
+    excludePlayerUndersDefault: false,
+    hideEvSlipWhenEmpty: false
   }, (items) => {
     document.getElementById('enableFilterModernization').checked = items.enableFilterModernization;
     document.getElementById('enablePctBadges').checked = items.enablePctBadges;
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mainTableDensity').value = items.mainTableDensity || 'standard';
     document.getElementById('customSharpDevig').checked = items.customSharpDevig;
     document.getElementById('excludePlayerUndersDefault').checked = items.excludePlayerUndersDefault;
+    document.getElementById('hideEvSlipWhenEmpty').checked = items.hideEvSlipWhenEmpty;
     syncDensityEnabled();
   });
 
@@ -94,7 +96,8 @@ function saveOptions() {
     modernizeMainTables: document.getElementById('modernizeMainTables').checked,
     mainTableDensity: document.getElementById('mainTableDensity').value,
     customSharpDevig: document.getElementById('customSharpDevig').checked,
-    excludePlayerUndersDefault: document.getElementById('excludePlayerUndersDefault').checked
+    excludePlayerUndersDefault: document.getElementById('excludePlayerUndersDefault').checked,
+    hideEvSlipWhenEmpty: document.getElementById('hideEvSlipWhenEmpty').checked
   };
 
   chrome.storage.local.set(settings, () => {

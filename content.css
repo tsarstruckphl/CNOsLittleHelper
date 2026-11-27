@@ -1043,12 +1043,12 @@ a.cno-devigger-btn.cno-calc-sharp-btn:hover {
 /* Positive EV page: "Add profit boost" in CNO's Calc popup */
 .cno-calc-boost {
   display: flex; flex-direction: column; align-items: center; gap: 3px; margin: -2px 0 8px;
-  font: 600 0.95rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #334155;
+  font: 600 1.05rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #334155;
 }
 .cno-calc-boost label { display: inline-flex; align-items: center; gap: 5px; cursor: default; }
 .cno-calc-boost-field { position: relative; display: inline-flex; align-items: center; }
 .cno-calc-boost input {
-  width: 76px; box-sizing: border-box; padding: 3px 22px 3px 7px; font: 400 0.95rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 100px; box-sizing: border-box; padding: 5px 24px 5px 9px; font: 400 1.15rem -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   border: 1px solid #cbd5e1; border-radius: 5px; background: #ffffff; color: #0f172a;
   -moz-appearance: textfield;
 }
@@ -1120,3 +1120,180 @@ a.cno-weather-badge:hover { background: #e0f2fe; }
 .cno-sharp-foot-links { display: inline-flex; align-items: center; gap: 12px; }
 /* Calc popup: Copy for Discord, under the last line */
 .cno-calc-share { text-align: center; margin: 8px 0 0; font-size: 12px; }
+
+/* ====================================================
+   EV BET SLIP (Positive EV page)
+   ==================================================== */
+/* + by the EV% and after the bet name: shown on row hover; the checkmark always shows */
+.cno-slip-add {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  border: none; background: none; padding: 1px; margin: 0; cursor: pointer; line-height: 0;
+  color: #0284c7; border-radius: 50%; opacity: 0; transition: opacity .12s;
+}
+.cno-slip-add svg { width: 18px; height: 18px; }
+.cno-slip-add.cno-slip-ev { margin-right: 4px; }
+.cno-slip-add.cno-slip-name { margin-left: 6px; }
+.cno-slip-add[hidden] { display: none; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tbody tr:hover .cno-slip-add { opacity: 1; }
+.cno-slip-add:hover { color: #0369a1; background: #e0f2fe; }
+.cno-slip-add.cno-slip-on { opacity: 1; color: #3B6D11; }
+.cno-slip-add.cno-slip-on:hover { color: #b91c1c; background: #fee2e2; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 tbody tr.cno-slip-row-on > td { box-shadow: inset 0 0 0 9999px rgba(59, 109, 17, 0.06); }
+
+/* The dock: over the right end of the line above the table. While scrolling it sticks to the
+   top of the window and the table's sticky header row sits just under it. Closed it's a bar; open, the same box grows into the full slip. */
+#cno-slip-dock { position: relative; height: 0; z-index: 1000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+#cno-slip-dock[hidden] { display: none; }
+/* The line above the table keeps room for it (same height whether or not the slip has drawn yet,
+   so the page doesn't jump); its text sits at the bottom, next to the table */
+#cno-slip-dock:not([hidden]) ~ #ContentPlaceHolderMain_ContentPlaceHolderRight_UpdatePanelGridView #cno-injury-refresh-banner,
+#cno-slip-dock:not([hidden]) + #cno-injury-refresh-banner {
+  min-height: 24px; padding-right: 470px; box-sizing: border-box; align-items: flex-end !important; padding-bottom: 2px;
+}
+.cno-slip-box {
+  position: absolute; right: 0; top: 0; width: 460px; box-sizing: border-box;
+  background: #ffffff; border: 2px solid #0284c7; border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.22); color: #0f172a; text-align: left;
+}
+.cno-slip-box.cno-open { box-shadow: 0 14px 36px rgba(15, 23, 42, 0.24); }
+.cno-slip-bar {
+  display: flex; align-items: center; gap: 9px; height: 38px; box-sizing: border-box; padding: 0 12px 0 7px;
+  cursor: pointer; white-space: nowrap; font-size: 15px; user-select: none;
+}
+.cno-slip-box.cno-open .cno-slip-bar { cursor: pointer; border-bottom: 1px solid #e2e8f0; height: 44px; }
+.cno-slip-bar-right { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; }
+.cno-slip-bar-hint { margin-left: auto; font-size: 12px; color: #64748b; }
+.cno-slip-pill-book { font-weight: 700; color: #475569; }
+.cno-slip-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .18s ease-out; }
+.cno-slip-box.cno-open .cno-slip-body { grid-template-rows: 1fr; }
+.cno-slip-body-in { overflow: hidden; min-height: 0; padding: 0 14px; font-size: 13px; }
+.cno-slip-box.cno-open .cno-slip-body-in { padding: 4px 14px 12px; }
+.cno-slip-num {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 25px; height: 25px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 999px; background: #3B6D11; color: #ffffff; font-size: 13px; font-weight: 700;
+}
+.cno-slip-pill-title, .cno-slip-pill-book { font-weight: 700; }
+.cno-slip-pill-odds { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cno-slip-pill-ev { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cno-slip-pill-ev.cno-pos, .cno-slip-leg-ev.cno-pos { color: #047857; }
+.cno-slip-pill-ev.cno-neg, .cno-slip-leg-ev.cno-neg { color: #b91c1c; }
+.cno-slip-sgp { font-weight: 700; color: #b45309; background: #fef3c7; border-radius: 4px; padding: 1px 6px; font-size: 11.5px; }
+/* Boosted: the original odds slashed (bottom left to top right) in gray, the new odds in purple */
+.cno-slip-was { position: relative; color: #94a3b8; margin-right: 6px; }
+.cno-slip-was::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; border-top: 1.5px solid #94a3b8; transform: rotate(-20deg); }
+.cno-slip-boosted { color: #534AB7; font-weight: 700; }
+@keyframes cno-slip-pulse { 0% { transform: scale(1); } 35% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(59, 109, 17, .2); } 100% { transform: scale(1); } }
+.cno-slip-box.cno-slip-pulse { animation: cno-slip-pulse .55s ease-out; transform-origin: right top; }
+
+.cno-slip-ttl-text { font-size: 15px; font-weight: 700; color: #0f172a; }
+/* The sportsbook: its own chip, set off from the title by a divider */
+.cno-slip-ttl-book {
+  margin-left: 2px; padding: 3px 10px; border-radius: 6px;
+  background: #e0f2fe; border: 1px solid #bae6fd; color: #0c4a6e; font-size: 14px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px;
+}
+.cno-slip-box.cno-open .cno-slip-ttl-text { padding-right: 11px; border-right: 1px solid #cbd5e1; line-height: 1.1; }
+.cno-slip-head-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.cno-slip-link-btn { border: 1px solid #e2e8f0; background: #ffffff; color: #334155; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 3px 9px; border-radius: 6px; margin-right: 10px; }
+.cno-slip-link-btn:hover { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.cno-slip-icon-btn { border: none; background: none; color: #64748b; cursor: pointer; padding: 3px; border-radius: 4px; line-height: 0; }
+.cno-slip-icon-btn:hover { background: #f1f5f9; color: #0f172a; }
+.cno-slip-empty { color: #64748b; font-size: 12.5px; margin: 10px 2px 2px; line-height: 1.45; }
+.cno-slip-parlay { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 6px; }
+.cno-slip-parlay-left { display: inline-flex; align-items: center; gap: 12px; }
+.cno-slip-parlay-ttl { font-weight: 700; font-size: 14px; }
+.cno-slip-parlay-odds { display: inline-flex; align-items: center; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cno-slip-odds-input {
+  width: 84px; box-sizing: border-box; padding: 3px 6px; text-align: center; font: 700 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; background: #ffffff;
+}
+.cno-slip-odds-input:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, .15); }
+.cno-slip-odds-input.cno-slip-was-input {
+  color: #94a3b8;
+  background: linear-gradient(to bottom right, transparent calc(50% - 0.75px), #94a3b8 calc(50% - 0.75px), #94a3b8 calc(50% + 0.75px), transparent calc(50% + 0.75px));
+}
+.cno-slip-unedited { display: block; margin: -2px 0 6px auto; border: none; background: none; padding: 0; color: #64748b; font-size: 11px; cursor: pointer; text-decoration: underline dotted; }
+.cno-slip-sgp-note { background: #fef3c7; color: #92400e; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 8px; line-height: 1.4; }
+.cno-slip-tiles { margin-bottom: 8px; }
+.cno-slip-opts { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin: 4px 0 8px; font-size: 12px; color: #334155; }
+.cno-slip-boost { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: #334155; }
+.cno-slip-boost input {
+  width: 50px; box-sizing: border-box; padding: 3px 18px 3px 5px; font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: 1px solid #cbd5e1; border-radius: 5px; background: #ffffff; color: #0f172a;
+}
+.cno-slip-boost input:focus { outline: none; border-color: #0284c7; }
+.cno-slip-switch { display: inline-flex; align-items: center; gap: 2px; background: #f1f5f9; border-radius: 6px; padding: 2px; }
+.cno-slip-switch-btn { border: none; background: none; padding: 3px 9px; border-radius: 4px; font-size: 12px; color: #64748b; cursor: pointer; }
+.cno-slip-switch-btn.cno-on { background: #ffffff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+.cno-slip-legs { border-top: 1px solid #e2e8f0; overflow-y: auto; }
+.cno-slip-leg { display: flex; align-items: center; gap: 8px; padding: 6px 2px; border-bottom: 1px solid #e2e8f0; line-height: 1.35; }
+.cno-slip-remove { border: none; background: none; padding: 0; margin-top: 0; cursor: pointer; color: #e11d48; line-height: 0; border-radius: 50%; }
+.cno-slip-remove:hover { color: #9f1239; background: #ffe4e6; }
+.cno-slip-leg-mid { flex: 1 1 auto; min-width: 0; }
+.cno-slip-leg-event { font-size: 11px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cno-slip-leg-name { font-weight: 700; font-size: 13.5px; }
+.cno-slip-leg-market { color: #64748b; }
+.cno-slip-leg-right { text-align: right; flex: 0 0 auto; }
+.cno-slip-leg-odds { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cno-slip-leg-odds.cno-slip-has-mini { cursor: help; text-decoration: underline dotted #94a3b8; text-underline-offset: 3px; }
+.cno-slip-cno-badge { font-size: 9.5px; font-weight: 600; color: #94a3b8; border: 1px solid #e2e8f0; border-radius: 3px; padding: 0 3px; line-height: 1.4; }
+.cno-slip-move { font-size: 9px; }
+.cno-slip-move.cno-up { color: #047857; }
+.cno-slip-move.cno-down { color: #b91c1c; }
+.cno-slip-leg-ev { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cno-slip-actions { display: flex; gap: 8px; margin-top: 8px; }
+.cno-slip-actions-main { margin-top: 10px; }
+.cno-slip-action {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid #cbd5e1; border-radius: 7px; background: #ffffff; padding: 6px 8px;
+  font: 600 12.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0369a1 !important;
+  text-decoration: none !important; cursor: pointer; white-space: nowrap;
+}
+.cno-slip-action:hover { border-color: #0284c7; background: #f0f9ff; }
+.cno-slip-action-big { padding: 9px 10px; font-size: 14px; }
+.cno-slip-actions-main .cno-slip-action-big:first-child { flex: 2 1 0; }
+.cno-slip-action.cno-off { color: #94a3b8 !important; background: #f8fafc; cursor: not-allowed; border-color: #e2e8f0; }
+#cno-slip-toast {
+  position: absolute; right: 6px; top: calc(var(--cno-slip-y, 2px) + 36px); max-width: 360px; z-index: 2;
+  background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 8px; padding: 8px 11px;
+  font-size: 12.5px; line-height: 1.4; box-shadow: 0 6px 16px rgba(15, 23, 42, .15);
+}
+#cno-slip-dock.cno-slip-is-open #cno-slip-toast { display: none; }
+#cno-slip-toast { top: calc(100% + 6px); right: 0; }
+.cno-slip-mini { width: auto; min-width: 320px; max-width: 420px; padding: 10px 12px; }
+.cno-slip-mini-ttl { font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+
+/* Calc popup: "Add to EV Bet Slip" */
+.cno-calc-slip { text-align: center; margin: 8px 0 0; }
+a.cno-calc-slip-btn { display: inline-flex !important; align-items: center; gap: 5px; }
+a.cno-calc-slip-btn svg { width: 15px; height: 15px; }
+
+/* Classic / enhanced switch on the tool pages: smaller and quieter */
+#cno-main-table-switch-line { display: flex; justify-content: flex-end; margin: 4px 0 0; }
+#cno-main-table-switch { padding: 2px 8px; font-size: 0.7rem; font-weight: 500; color: #64748b; border-color: #e2e8f0; }
+#cno-main-table-switch:hover { color: #0369a1; border-color: #93c5fd; }
+#cno-main-table-switch svg { width: 12px; height: 12px; }
+/* Stuck at the top: a white band behind it, and the header row just below */
+.cno-slip-band { display: none; position: fixed; top: 0; height: 50px; background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1.cno-slip-has-dock > thead { top: 50px !important; }
+/* Profit boost box: no up / down arrows */
+.cno-slip-boost input { -moz-appearance: textfield; appearance: textfield; }
+.cno-slip-boost input::-webkit-outer-spin-button, .cno-slip-boost input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* Profit boost number centered, except while typing */
+.cno-slip-boost input { text-align: center; padding-left: 4px; }
+.cno-slip-boost input:focus { text-align: left; }
+/* EV tile: the boost note right under "Sharp EV%" */
+.cno-slip-tiles .cno-sharp-tile-label { line-height: 1.25; }
+.cno-slip-tiles .cno-sharp-tile-boost { margin: 0; line-height: 1.25; }
+/* Bet name: room for the filter button at the right, so it doesn't sit on the + */
+#ContentPlaceHolderMain_ContentPlaceHolderRight_GridView1 td:has(> .cno-slip-name) { padding-right: 34px; }
+/* Closed bar: quick clear (hover only, two clicks) */
+.cno-slip-quick-clear {
+  margin-left: 6px; border: none; background: none; padding: 2px 5px; border-radius: 5px; cursor: pointer;
+  font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #94a3b8;
+  visibility: hidden; white-space: nowrap;
+}
+.cno-slip-box:not(.cno-open) .cno-slip-bar:hover .cno-slip-quick-clear { visibility: visible; }
+.cno-slip-quick-clear:hover { color: #475569; background: #f1f5f9; }
+.cno-slip-quick-clear.cno-confirm { visibility: visible; color: #ffffff; background: #dc2626; }
+.cno-slip-quick-clear.cno-confirm:hover { background: #b91c1c; color: #ffffff; }

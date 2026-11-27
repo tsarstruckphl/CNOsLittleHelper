@@ -2323,8 +2323,11 @@ function restyleFilterPanel() {
     boostAmountContainer.className = 'cno-field cno-field-important';
 
     const boostAmtLabel = document.createElement('label');
-    boostAmtLabel.textContent = 'Boost Amount';
-    boostAmtLabel.appendChild(createBoostDefaultLinks());
+    const boostAmtText = document.createElement('span');
+    boostAmtText.textContent = 'Boost Amount';
+    boostAmtText.style.whiteSpace = 'nowrap';
+    boostAmtLabel.appendChild(boostAmtText);
+    boostAmtLabel.appendChild(createBoostDefaultLinks()); // on its own line, under the label
     boostAmountContainer.appendChild(boostAmtLabel);
 
     const boostInputsWrap = document.createElement('div');
@@ -5317,13 +5320,13 @@ function ensureMainTableSwitch(table, modern) {
     ? 'Show the table the way CNO draws it (same as turning off "Restyle Results Tables" in the options)'
     : 'Turn the restyled table back on (same as "Restyle Results Tables" in the options)';
 
-  // Lives on the injury-status line (which always reserves its space above the table)
-  const banner = document.getElementById('cno-injury-refresh-banner');
-  if (banner) {
-    if (btn.parentNode !== banner || banner.lastElementChild !== btn) {
-      btn.style.marginLeft = '12px';
-      banner.appendChild(btn);
-    }
+  // Its own line right under the filters (else just above the table)
+  const acc = document.getElementById('ContentPlaceHolderMain_ContentPlaceHolderRight_MyAccordion');
+  if (acc && acc.parentNode) {
+    let line = document.getElementById('cno-main-table-switch-line');
+    if (!line) { line = document.createElement('div'); line.id = 'cno-main-table-switch-line'; }
+    if (acc.nextElementSibling !== line) acc.parentNode.insertBefore(line, acc.nextSibling);
+    if (btn.parentNode !== line) line.appendChild(btn);
   } else if (btn.nextElementSibling !== table) {
     btn.style.marginLeft = '';
     table.parentNode.insertBefore(btn, table);
@@ -5407,7 +5410,9 @@ function processMainTableModern() {
   const hasHedge = headTexts.some(h => h.startsWith('hedge'));
   const ABBR = { 'low hold odds': 'L.H. Odds', 'hedge bet odds': 'H.B. Odds', 'promo bet odds': 'P.B. Odds' };
   Array.from(table.querySelectorAll('thead th')).forEach((th, i) => {
-    const abbr = hasHedge ? ABBR[headTexts[i]] : null;
+    // No hedge bet (Profit Strategy = +EV): the one price column is just "Odds"
+    const abbr = hasHedge ? ABBR[headTexts[i]]
+      : (/ odds$/.test(headTexts[i]) && headTexts[i] !== 'fair odds' ? 'Odds' : null);
     if (abbr) {
       if (!th.style.getPropertyValue('--lh-th-fs')) th.style.setProperty('--lh-th-fs', getComputedStyle(th).fontSize);
       if (th.getAttribute('data-lh-abbr') !== abbr) th.setAttribute('data-lh-abbr', abbr);
@@ -5581,7 +5586,7 @@ function getBoostInputs() {
 function createBoostDefaultLinks() {
   const wrap = document.createElement('span');
   wrap.id = 'cno-boost-default-links';
-  wrap.style.cssText = 'margin-left: 8px; font-size: 0.72rem !important; font-weight: 500 !important; color: #94a3b8 !important; text-transform: none; letter-spacing: 0;';
+  wrap.style.cssText = 'display: block; margin: 1px 0 0; white-space: nowrap; font-size: 0.72rem !important; font-weight: 500 !important; color: #94a3b8 !important; text-transform: none; letter-spacing: 0;';
 
   const mk = (text, title, onClick) => {
     const a = document.createElement('a');
@@ -5596,7 +5601,7 @@ function createBoostDefaultLinks() {
     return a;
   };
 
-  const setLink = mk('Set as default', 'Use the current boost type and amount whenever this page opens', () => {
+  const setLink = mk('Set default', 'Use the current boost type and amount whenever this page opens', () => {
     const typeEl = document.querySelector('input[name$="RadioButtonListOddsBoostType"]:checked');
     const { pct, odds } = getBoostInputs();
     const value = {
@@ -5935,7 +5940,7 @@ function processHiddenRowsNote() {
     if (note) note.remove();
     note = document.createElement('span');
     note.id = 'cno-injured-hidden-note';
-    note.style.cssText = 'margin-right: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 500; color: #94a3b8;';
+    note.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 500; color: #94a3b8;';
     banner.insertBefore(note, banner.firstChild);
   }
   const text = `${total} row${total === 1 ? '' : 's'} hidden: ${parts.join(', ')}`;
@@ -6002,7 +6007,20 @@ const CNO_DEVIG_METHOD_NAMES = { multiplicative: 'Multiplicative', additive: 'Ad
 
 let cnoSharpConfig = null;
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-  chrome.storage.local.get([CNO_SHARP_CONFIG_KEY], (d) => { cnoSharpConfig = (d && d[CNO_SHARP_CONFIG_KEY]) || null; });
+  chrome.storage.local.get({ [CNO_SHARP_CONFIG_KEY]: null, customSharpDevig: true }, (d) => {
+    cnoSharpConfig = (d && d[CNO_SHARP_CONFIG_KEY]) || null;
+    // On (the default) but never set up: start from the defaults sheet, as the sharp books page does
+    if (!cnoSharpConfig && d.customSharpDevig && typeof loadSharpDefaults === 'function') {
+      loadSharpDefaults((defaults) => {
+        if (!defaults) return;
+        chrome.storage.local.get([CNO_SHARP_CONFIG_KEY], (now) => {
+          if (now && now[CNO_SHARP_CONFIG_KEY]) return; // set up meanwhile
+          cnoSharpConfig = defaults;
+          chrome.storage.local.set({ [CNO_SHARP_CONFIG_KEY]: defaults });
+        });
+      });
+    }
+  });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes[CNO_SHARP_CONFIG_KEY]) cnoSharpConfig = changes[CNO_SHARP_CONFIG_KEY].newValue || null;
   });
@@ -6823,10 +6841,12 @@ function cnoShareHeaderLines(o) {
   const book = String(o.book || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
   const title = `${cnoShareBetTitle(o.betName, o.market)} ${o.odds}`.trim().replace(/[[\]]/g, '');
   const linked = o.url ? `**[${title}](<${o.url}>)**` : `**${title}**`;
-  const tag = o.boosted ? `boosted to ${o.boosted}` : (o.tag || '');
+  const tag = o.boosted ? `boosted to ${o.boosted}` : '';
   const lines = [`## ${book ? book + ': ' : ''}${linked}${tag ? `  *(${tag})*` : ''}`];
   const sub = [o.event, cnoShareWhen(o.dateText)].filter(Boolean).join(' | ');
-  if (sub) lines.push(sub);
+  // Promo bets: the promo on its own bold line. The event line is small.
+  if (o.tag && !o.boosted) lines.push(`**${o.tag}**`);
+  if (sub) lines.push(`-# ${sub}`);
   if (o.boosted) {
     lines.push('');
     lines.push(`${o.boostPct}% profit boost. ${o.odds} boosted to ${o.boosted}.`);
@@ -6843,8 +6863,9 @@ function cnoShareKelly(fullUnits, fbText) {
 
 function cnoShareFooterLines(deviggerUrl) {
   const out = [];
+  // The "Generated by" line right under the link (no blank line), so the gap is small
   if (deviggerUrl) out.push('', `[View/Edit Devig](<${deviggerUrl}>)`);
-  out.push('', `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
+  out.push(...(deviggerUrl ? [] : ['']), `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
   return out;
 }
 
@@ -6926,7 +6947,7 @@ function cnoDevigMethodAbbrev() {
 }
 
 function cnoSyncCalcShare(table, data) {
-  let wrap = table.nextElementSibling && table.nextElementSibling.classList.contains('cno-calc-share') ? table.nextElementSibling : null;
+  let wrap = table.parentNode ? table.parentNode.querySelector(':scope > .cno-calc-share') : null;
   if (!wrap) {
     wrap = cnoSharpEl('div', 'cno-calc-share');
     const a = cnoSetIconLabel(cnoSharpEl('a', 'cno-sharp-open cno-calc-share-btn'), 'discord', 'Copy for Discord');
@@ -6945,7 +6966,8 @@ function cnoSyncCalcShare(table, data) {
       try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (err) { done(false); }
     });
     wrap.appendChild(a);
-    table.parentNode.insertBefore(wrap, table.nextSibling);
+    const slip = table.parentNode.querySelector(':scope > .cno-calc-slip');
+    table.parentNode.insertBefore(wrap, (slip || table).nextSibling);
   }
   wrap._data = data;
 }
@@ -6960,10 +6982,10 @@ function cnoCalcPromoInfo(d) {
   const ev = String(d.promoEv || '').trim();
   if (!ev) return null;
   const ev1 = (() => { const n = parseFloat(ev); return isFinite(n) ? `${n.toFixed(1)}%` : ev; })();
-  if (/risk/.test(type)) return { tag: `RISK-FREE BET${rm ? `, ${rm[2]} conversion` : ''}`, label: 'RISK-FREE BET', ev: ev1 };
-  if (/bet\s*&\s*get/.test(type)) return { tag: `BET & GET${rewardText ? `, ${rewardText}` : ''}`, label: 'BET & GET', ev: ev1 };
-  if (/win\s*&\s*get/.test(type)) return { tag: `WIN & GET${rewardText ? `, ${rewardText}` : ''}`, label: 'WIN & GET', ev: ev1 };
-  if (/free bet/.test(type)) return { tag: 'FREE BET', label: 'FREE BET', ev: ev1 };
+  if (/risk/.test(type)) return { tag: `Risk-Free Bet${rm ? `, ${rm[2]} conversion` : ''}`, label: 'Risk-Free Bet', ev: ev1 };
+  if (/bet\s*&\s*get/.test(type)) return { tag: `Bet & Get${rewardText ? `, ${rewardText}` : ''}`, label: 'Bet & Get', ev: ev1 };
+  if (/win\s*&\s*get/.test(type)) return { tag: `Win & Get${rewardText ? `, ${rewardText}` : ''}`, label: 'Win & Get', ev: ev1 };
+  if (/free bet/.test(type)) return { tag: 'Free Bet', label: 'Free Bet', ev: ev1 };
   return null;
 }
 
@@ -7298,7 +7320,8 @@ function processEventInjuryIcons() {
     if (existing) return;
     const btn = createHoverFilterBtn('Injury report for this game', () => cnoOpenInjuryPopup(btn, row, league), CNO_INJURY_ICON_SVG);
     btn.classList.add('cno-injury-list-btn');
-    getHoverTray(cell).appendChild(btn);
+    const tray = getHoverTray(cell);
+    tray.insertBefore(btn, tray.firstChild); // injury report first, the event filter to its right
   });
 }
 
@@ -7488,7 +7511,9 @@ function processDeviggerQrButton() {
     const m = (copyBtn.getAttribute('onclick') || '').match(/CopyToClipboard\('([^']+)'\)/);
     const getUrl = () => {
       const box = m ? document.getElementById(m[1]) : null;
-      return box ? String(box.value || box.textContent || '').trim() : '';
+      const url = box ? String(box.value || box.textContent || '').trim() : '';
+      // Opens scrolled to the results (the line right under "Results:", which has no anchor itself)
+      return url ? `${url.split('#')[0]}#LabelOutput` : '';
     };
     const fakeLink = { get href() { return getUrl(); } };
     const qr = createQrBtn(fakeLink, () => 'Devigger link', () => ({}));
@@ -7646,12 +7671,12 @@ function cnoLowHoldShareText() {
 
   const lines = [roi > 0 ? `## Arb: **+${pct2(roi)} ROI**` : `## Low Hold: **${pct2(hold)}**`];
   const sub = [text('PopupCalc_EventName'), text('PopupCalc_Market'), cnoShareWhen(text('PopupCalc_Date'))].filter(Boolean).join(' | ');
-  if (sub) lines.push(sub);
+  if (sub) lines.push(`-# ${sub}`);
   lines.push('', side('LowHold', oddsA, stakeA), side('Hedge', oddsB, stakeB), '-# Stakes per $100 on the first side', '');
   lines.push(`Payout ${money(payout)} · Cost ${money(cost)} · **Profit ${money(profit)} (ROI ${roi > 0 ? '+' : ''}${pct2(roi)})**`);
   const o = cnoSpreadOddsToken(oddsA), h = cnoSpreadOddsToken(oddsB);
   if (o && h) lines.push('', `[Open in Hedge Calculator](<https://www.thespread.com/betting-tools/hedge-calculator/#f=a&m=eq&s=${stakeA}&o=${o}&h=${h}>)`);
-  lines.push('', `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
+  lines.push(...(o && h ? [] : ['']), `-# Generated by [CNO's Little Helper](<${CNO_LH_SITE_URL}>)`);
   return lines.join('\n');
 }
 

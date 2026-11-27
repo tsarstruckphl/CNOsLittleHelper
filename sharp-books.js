@@ -334,7 +334,7 @@ function sbInit() {
     if (area === 'local' && changes.customSharpDevig) $('offNotice').hidden = !!changes.customSharpDevig.newValue;
   });
 
-  chrome.storage.local.get({ customSharpDevig: false, [CNO_SHARP_CONFIG_KEY]: null }, (items) => {
+  chrome.storage.local.get({ customSharpDevig: true, [CNO_SHARP_CONFIG_KEY]: null }, (items) => {
     $('offNotice').hidden = !!items.customSharpDevig;
     loadBooksList((books) => {
       sbBooks = books || [];

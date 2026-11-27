@@ -33,6 +33,7 @@ processUpdateBannerAlert(); // Added update banner check
   processCalcPopup();
   processCalcBookLinks();
   processLowHoldShare();
+  processEvBetSlip();
   processDeviggerQrButton();
   processInjuryBadges();
   processPlayerTableRefreshTimestamp();

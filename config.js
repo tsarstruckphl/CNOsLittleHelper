@@ -61,8 +61,9 @@ const CNO_USER_SETTING_DEFAULTS = {
   modernizeGameTable: true,
   modernizeMainTables: true,
   mainTableDensity: 'standard',
-  customSharpDevig: false,
+  customSharpDevig: true,
   excludePlayerUndersDefault: false,
+  hideEvSlipWhenEmpty: false,          // Positive EV: hide the EV Bet Slip until a leg is added
   useClassicFilterView: false,          // Switch to Classic / Enhanced View (was in the site's localStorage)
   enableRightClickDevig: true,          // game page right-click devig checkbox (was in the site's localStorage)
   excludePlayerUndersByPage: {}         // { 'positive-ev': true|false } (was in the site's localStorage)
@@ -690,7 +691,8 @@ const CNO_STORAGE_NOT_BACKED_UP = [
   'cno_books_sheet_cache', 'cno_site_defaults_cache', 'cno_dismissed_notice',
   'cno_last_update_check', 'cno_checked_version', 'updateAvailable', 'latestVersion',
   'downloadUrl', 'releasePageUrl',
-  'cno_team_abbr_cache', 'cno_market_abbr_cache' // Devigger comment abbreviations (Google Sheet copies)
+  'cno_team_abbr_cache', 'cno_market_abbr_cache', // Devigger comment abbreviations (Google Sheet copies)
+  'cno_ev_slip' // the EV Bet Slip's current legs and boost (temporary)
 ];
 
 function cnoBackupHelperKeys() {

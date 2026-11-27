@@ -766,24 +766,27 @@ function processPlayerTableRefreshTimestamp() {
     banner.id = 'cno-injury-refresh-banner';
     banner.style.cssText = `
       display: flex;
-      justify-content: flex-end;
+      justify-content: flex-start;
       align-items: center;
-      font-size: 0.76rem;
-      font-weight: 600;
-      color: #64748b;
+      gap: 12px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #94a3b8;
       margin-bottom: 4px;
       width: 100%;
     `;
   }
-  if (banner.nextElementSibling !== table) {
+  // Right above the table (the EV Bet Slip's dock may sit between them)
+  const next = banner.nextElementSibling;
+  if (next !== table && !(next && next.id === 'cno-slip-dock' && next.nextElementSibling === table)) {
     table.parentNode.insertBefore(banner, table);
   }
 
   // The space is always kept so the gap between the filters and the table doesn't change;
   // when there's nothing to show, the same line is rendered invisibly.
   const html = showNotice
-    ? `<span>Injury Statuses Last Refreshed at <strong>${tsToDisplay}</strong></span>`
-    : `<span style="visibility:hidden;" aria-hidden="true">Injury Statuses Last Refreshed at <strong>00:00</strong></span>`;
+    ? `<span class="cno-injury-updated">Injury statuses last refreshed at ${tsToDisplay}</span>`
+    : `<span class="cno-injury-updated" style="visibility:hidden;" aria-hidden="true">Injury statuses last refreshed at 00:00</span>`;
   if (banner.dataset.cnoHtml !== html) {
     banner.innerHTML = html;
     banner.dataset.cnoHtml = html;

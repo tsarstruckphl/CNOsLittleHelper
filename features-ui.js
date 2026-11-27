@@ -91,6 +91,22 @@ function getOwnText(el) {
   return t.trim();
 }
 
+// The popup's date line, or (when it isn't a date: the promo calculators show the sport there)
+// the Date cell of the row the popup is for
+function cnoCalcPopupDate(popupDate) {
+  if (/\d{1,2}:\d{2}/.test(popupDate || '')) return popupDate;
+  const btn = typeof cnoLastCalcBtn !== 'undefined' && cnoLastCalcBtn && cnoLastCalcBtn.isConnected ? cnoLastCalcBtn : null;
+  const row = btn && btn.closest('tr');
+  const table = btn && btn.closest('table');
+  if (!row || !table) return '';
+  const i = Array.from(table.querySelectorAll('thead th')).findIndex(th => th.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === 'date');
+  const cell = i >= 0 ? row.children[i] : null;
+  if (!cell) return '';
+  const dt = cell.querySelector('datetime');
+  const text = (dt ? (dt.dataset.lhOrig || dt.textContent) : cell.textContent).replace(/\s+/g, ' ').trim();
+  return /\d{1,2}:\d{2}/.test(text) ? text : '';
+}
+
 function updateDeviggerLink(popup) {
   const activeTab = popup.querySelector('.ajax__tab_panel[style*="visible"], .ajax__tab_panel[style*="block"]') || popup;
 
@@ -199,6 +215,7 @@ function updateDeviggerLink(popup) {
   }
   // "Custom Sharp EV" to its right (filter-ui.js), when that row has a sharp-book set
   if (typeof cnoSyncCalcSharpBtn === 'function') cnoSyncCalcSharpBtn(linkContainer);
+  if (typeof cnoSyncCalcSlipBtn === 'function') cnoSyncCalcSlipBtn(linkContainer); // EV Bet Slip (bet-slip.js)
   if (typeof cnoSyncCalcBoost === 'function') cnoSyncCalcBoost(linkContainer, fairOdds, finalOdds);
   // "Copy for Discord" under the calculator's last line (filter-ui.js)
   if (typeof cnoSyncCalcShare === 'function') {
@@ -213,7 +230,7 @@ function updateDeviggerLink(popup) {
       fairPct: fairEl ? parseFloat(fairEl.getAttribute('percentage')) : hitPct,
       promoType: hitEl ? textOf('EVTab_Type') : '', promoEv: hitEl ? textOf('EVTab_EVPercentage') : '',
       reward: hitEl ? textOf('EVTab_Reward') : '',
-      event: textOf('EventName'), market: textOf('_Market'), betName: textOf('BetName'), dateText: textOf('_Date'),
+      event: textOf('EventName'), market: textOf('_Market'), betName: textOf('BetName'), dateText: cnoCalcPopupDate(textOf('_Date')),
       book: textOf('SportsbookSite').replace(/\s*\([^)]*\)\s*$/, '')
     });
   }
